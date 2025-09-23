@@ -17,4 +17,4 @@ databases:
   - name: quiz-db
     databaseName: quiz_system
     user: quiz_user
-    plan: starter
+    plan: free
