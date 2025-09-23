@@ -450,6 +450,22 @@ def generate_qr(quiz_id: int, db: Session = Depends(get_db)):
         "url": quiz_url
     }
 
+@app.get("/api/responses")
+def get_all_responses(db: Session = Depends(get_db)):
+    responses = db.query(UserResponse).all()
+    result = []
+    for r in responses:
+        result.append({
+            "participation_id": r.participation_id,
+            "user_uni": r.participation.user.uni,      # quién contestó
+            "quiz_title": r.participation.quiz.title,  # de qué quiz
+            "question_text": r.question.question_text, # qué pregunta
+            "answer_text": r.answer.answer_text,       # qué contestó
+            "is_correct": r.is_correct,
+            "response_time": r.response_time,
+        })
+    return result
+
 # Health check
 @app.get("/")
 def health_check():
