@@ -93,6 +93,8 @@ class UserResponse(Base):
     answered_at = Column(DateTime, default=datetime.utcnow)
     
     participation = relationship("Participation", back_populates="responses")
+    question = relationship("Question")   # 🔹 agregar
+    answer = relationship("Answer")       # 🔹 agregar
 
 # Pydantic Models (NOMBRES CORREGIDOS AQUÍ)
 class UserCreate(BaseModel):
@@ -457,15 +459,16 @@ def get_all_responses(db: Session = Depends(get_db)):
     for r in responses:
         result.append({
             "participation_id": r.participation_id,
-            "user_uni": r.participation.user.uni,      # quién contestó
-            "quiz_title": r.participation.quiz.title,  # de qué quiz
-            "question_text": r.question.question_text, # qué pregunta
-            "answer_text": r.answer.answer_text,       # qué contestó
+            "user_uni": r.participation.user.uni,
+            "quiz_title": r.participation.quiz.title,
+            "question_text": r.question.question_text,
+            "answer_text": r.answer.answer_text,
             "is_correct": r.is_correct,
             "response_time": r.response_time,
+            "answered_at": r.answered_at
         })
     return result
-
+    
 # Health check
 @app.get("/")
 def health_check():
