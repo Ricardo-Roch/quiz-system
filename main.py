@@ -94,12 +94,12 @@ class UserResponse(Base):
     
     participation = relationship("Participation", back_populates="responses")
 
-# Pydantic Models
+# Pydantic Models (NOMBRES CORREGIDOS AQUÍ)
 class UserCreate(BaseModel):
     uni: str
     name: str
 
-class UserResponse(BaseModel):
+class UserOut(BaseModel):
     id: int
     uni: str
     name: str
@@ -127,7 +127,7 @@ class QuestionCreate(BaseModel):
     time_limit: int = 30
     answers: List[AnswerCreate]
 
-class QuizResponse(BaseModel):
+class QuizOut(BaseModel):
     id: int
     title: str
     area: str
@@ -135,32 +135,32 @@ class QuizResponse(BaseModel):
     is_active: bool
     created_at: datetime
 
-class AnswerResponse(BaseModel):
+class AnswerOut(BaseModel):
     id: int
     answer_text: str
     answer_order: int
 
-class QuestionResponse(BaseModel):
+class QuestionOut(BaseModel):
     id: int
     question_text: str
     question_order: int
     time_limit: int
-    answers: List[AnswerResponse]
+    answers: List[AnswerOut]
 
-class QuizDetailResponse(BaseModel):
+class QuizDetailOut(BaseModel):
     id: int
     title: str
     area: str
     description: Optional[str]
     is_active: bool
-    questions: List[QuestionResponse]
+    questions: List[QuestionOut]
 
 class SubmitAnswer(BaseModel):
     question_id: int
     answer_id: int
     response_time: int
 
-class ParticipationResponse(BaseModel):
+class ParticipationOut(BaseModel):
     id: int
     quiz_title: str
     score: int
@@ -193,7 +193,7 @@ def get_db():
         db.close()
 
 # User endpoints
-@app.post("/api/users/", response_model=UserResponse)
+@app.post("/api/users/", response_model=UserOut)
 def create_user(user: UserCreate, db: Session = Depends(get_db)):
     db_user = db.query(User).filter(User.uni == user.uni).first()
     if db_user:
@@ -205,14 +205,14 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
     db.refresh(db_user)
     return db_user
 
-@app.get("/api/users/{uni}", response_model=UserResponse)
+@app.get("/api/users/{uni}", response_model=UserOut)
 def get_user_by_uni(uni: str, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.uni == uni).first()
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     return user
 
-@app.get("/api/users/{uni}/participations", response_model=List[ParticipationResponse])
+@app.get("/api/users/{uni}/participations", response_model=List[ParticipationOut])
 def get_user_participations(uni: str, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.uni == uni).first()
     if not user:
@@ -233,7 +233,7 @@ def get_user_participations(uni: str, db: Session = Depends(get_db)):
     return result
 
 # Quiz endpoints
-@app.post("/api/quizzes/", response_model=QuizResponse)
+@app.post("/api/quizzes/", response_model=QuizOut)
 def create_quiz(quiz: QuizCreate, db: Session = Depends(get_db)):
     db_quiz = Quiz(title=quiz.title, area=quiz.area, description=quiz.description)
     db.add(db_quiz)
@@ -241,14 +241,14 @@ def create_quiz(quiz: QuizCreate, db: Session = Depends(get_db)):
     db.refresh(db_quiz)
     return db_quiz
 
-@app.get("/api/quizzes/", response_model=List[QuizResponse])
+@app.get("/api/quizzes/", response_model=List[QuizOut])
 def get_quizzes(active_only: bool = False, db: Session = Depends(get_db)):
     query = db.query(Quiz)
     if active_only:
         query = query.filter(Quiz.is_active == True)
     return query.all()
 
-@app.get("/api/quizzes/{quiz_id}", response_model=QuizDetailResponse)
+@app.get("/api/quizzes/{quiz_id}", response_model=QuizDetailOut)
 def get_quiz(quiz_id: int, db: Session = Depends(get_db)):
     quiz = db.query(Quiz).filter(Quiz.id == quiz_id).first()
     if not quiz:
@@ -276,7 +276,7 @@ def get_quiz(quiz_id: int, db: Session = Depends(get_db)):
         "questions": sorted(questions, key=lambda x: x["question_order"])
     }
 
-@app.put("/api/quizzes/{quiz_id}", response_model=QuizResponse)
+@app.put("/api/quizzes/{quiz_id}", response_model=QuizOut)
 def update_quiz(quiz_id: int, quiz_update: QuizUpdate, db: Session = Depends(get_db)):
     quiz = db.query(Quiz).filter(Quiz.id == quiz_id).first()
     if not quiz:
