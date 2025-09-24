@@ -576,7 +576,8 @@
 
     async function loadUser(uni) {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/users/${uni}`);
+        const response = await fetch(`${API_BASE_URL}/api/users/by-uni/${encodeURIComponent(uni)}`);
+
         if (response.ok) {
           currentUser = await response.json();
         } else {
@@ -632,7 +633,7 @@
       
       try {
         // Iniciar participación
-        const response = await fetch(`${API_BASE_URL}/api/participate/${currentQuiz.id}?uni=${currentUser.uni}`, {
+        const response = await fetch(`${API_BASE_URL}/api/participations/${participationId}/complete`, {
           method: 'POST'
         });
 
@@ -757,7 +758,7 @@
 
       try {
         // Enviar respuesta
-        const response = await fetch(`${API_BASE_URL}/api/participate/${participationId}/submit`, {
+        const response = await fetch(`${API_BASE_URL}/api/participations/${participationId}/answers`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
