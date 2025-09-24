@@ -1,3 +1,5 @@
+
+
 <!doctype html>
 <html lang="es">
 <head>
@@ -422,339 +424,419 @@
   </div>
 
   <script>
-    // Configuración de la API
-    const API_BASE_URL = 'https://quiz-system-sfrf.onrender.com';
-    
-    // Variables globales
-    let currentUser = null;
-    let availableQuizzes = [];
+  // Configuración de la API
+const API_BASE_URL = 'https://quiz-system-sfrf.onrender.com';
 
-    // Elementos DOM
-    const loginScreen = document.getElementById('loginScreen');
-    const quizListScreen = document.getElementById('quizListScreen');
-    const uniInput = document.getElementById('uniInput');
-    const nameInput = document.getElementById('nameInput');
-    const loginBtn = document.getElementById('loginBtn');
-    const loginError = document.getElementById('loginError');
-    const loginLoading = document.getElementById('loginLoading');
-    const backBtn = document.getElementById('backBtn');
-    const userInfo = document.getElementById('userInfo');
-    const userName = document.getElementById('userName');
-    const userUni = document.getElementById('userUni');
-    const quizList = document.getElementById('quizList');
-    const quizLoading = document.getElementById('quizLoading');
-    const quizError = document.getElementById('quizError');
-    const emptyState = document.getElementById('emptyState');
+// Variables globales
+let currentUser = null;
+let availableQuizzes = [];
 
-    // Event Listeners
-    uniInput.addEventListener('input', handleUniInput);
-    nameInput.addEventListener('input', handleNameInput);
-    loginBtn.addEventListener('click', handleLogin);
-    backBtn.addEventListener('click', handleBack);
+// Elementos DOM
+const loginScreen = document.getElementById('loginScreen');
+const quizListScreen = document.getElementById('quizListScreen');
+const uniInput = document.getElementById('uniInput');
+const nameInput = document.getElementById('nameInput');
+const loginBtn = document.getElementById('loginBtn');
+const loginError = document.getElementById('loginError');
+const loginLoading = document.getElementById('loginLoading');
+const userInfo = document.getElementById('userInfo');
+const userName = document.getElementById('userName');
+const userUni = document.getElementById('userUni');
+const quizList = document.getElementById('quizList');
+const quizLoading = document.getElementById('quizLoading');
+const quizError = document.getElementById('quizError');
+const emptyState = document.getElementById('emptyState');
 
-    // Enter key support
-    uniInput.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter' && !loginBtn.disabled) {
-        if (nameInput.style.display === 'none') {
-          handleLogin();
-        }
-      }
-    });
+// Event Listeners
+uniInput.addEventListener('input', handleUniInput);
+nameInput.addEventListener('input', handleNameInput);
+loginBtn.addEventListener('click', handleLogin);
 
-    nameInput.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter' && !loginBtn.disabled) {
-        handleLogin();
-      }
-    });
+// =====================
+// SESSION MANAGEMENT
+// =====================
 
-    function handleUniInput() {
-      const uni = uniInput.value.trim();
-      loginBtn.disabled = uni.length === 0;
-      hideError();
-      
-      // Solo permitir números y letras
-      // uniInput.value = uni.replace(/[^0-9a-zA-Z]/g, '');
-    }
+// Save user session to localStorage
+function saveUserSession(user) {
+  const sessionData = {
+    user: user,
+    timestamp: Date.now(),
+    expiryTime: Date.now() + (7 * 24 * 60 * 60 * 1000) // 7 days
+  };
+  localStorage.setItem('conectahoot_session', JSON.stringify(sessionData));
+  
+  // Also save as cookie
+  const expiryDate = new Date();
+  expiryDate.setTime(expiryDate.getTime() + (7 * 24 * 60 * 60 * 1000)); // 7 days
+  document.cookie = `conectahoot_user=${encodeURIComponent(JSON.stringify(user))}; expires=${expiryDate.toUTCString()}; path=/`;
+}
 
-    function handleNameInput() {
-      const name = nameInput.value.trim();
-      const uni = uniInput.value.trim();
-      loginBtn.disabled = uni.length === 0 || name.length === 0;
-      hideError();
-    }
-
-    async function handleLogin() {
-      const uni = uniInput.value.trim();
-      const name = nameInput.value.trim();
-
-      if (!uni) {
-        showError('Por favor ingresa tu UNI');
-        return;
-      }
-
-      loginBtn.disabled = true;
-      loginLoading.style.display = 'block';
-      hideError();
-
-      try {
-        console.log('Attempting to login with UNI:', uni);
-        
-        // Usar el endpoint correcto que espera UNI como string
-        let user = await getUser(uni);
-        
-        if (!user) {
-          // Si el usuario no existe y tenemos nombre, crear usuario
-          if (name) {
-            console.log('Creating new user with UNI:', uni, 'and name:', name);
-            user = await createUser(uni, name);
-          } else {
-            // Mostrar campo de nombre si no existe el usuario
-            nameInput.style.display = 'block';
-            loginBtn.textContent = 'Crear Usuario';
-            showError('Usuario no encontrado. Ingresa tu nombre para crear una cuenta nueva.');
-            return;
-          }
-        }
-
-        console.log('User authenticated:', user);
-        currentUser = user;
-        await loadQuizzes();
-        showQuizList();
-
-      } catch (error) {
-        console.error('Error en login:', error);
-        showError('Error al conectar con el servidor. Inténtalo de nuevo.');
-      } finally {
-        loginBtn.disabled = false;
-        loginLoading.style.display = 'none';
-      }
-    }
-
-    async function getUser(uni) {
-      try {
-        console.log('Fetching user with UNI:', uni);
-        // FIXED: Use the correct endpoint for getting user by UNI
-        const response = await fetch(`${API_BASE_URL}/api/users/by-uni/${encodeURIComponent(uni)}`);
-        
-        console.log('API Response status:', response.status);
-        
-        if (response.ok) {
-          const user = await response.json();
-          console.log('User found:', user);
-          return user;
-        } else if (response.status === 404) {
-          console.log('User not found');
-          return null; // Usuario no existe
-        } else {
-          const errorText = await response.text();
-          console.error('API Error:', response.status, errorText);
-          throw new Error(`Error HTTP: ${response.status} - ${errorText}`);
-        }
-      } catch (error) {
-        console.error('Error obteniendo usuario:', error);
-        throw error;
-      }
-    }
-
-    async function createUser(uni, name) {
-      try {
-        console.log('Creating user:', { uni, name });
-        const response = await fetch(`${API_BASE_URL}/api/users/`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ uni, name })
-        });
-
-        console.log('Create user response status:', response.status);
-
-        if (response.ok) {
-          const user = await response.json();
-          console.log('User created:', user);
-          return user;
-        } else {
-          const errorData = await response.text();
-          console.error('Error creating user:', response.status, errorData);
-          throw new Error(`Error creando usuario: ${response.status} - ${errorData}`);
-        }
-      } catch (error) {
-        console.error('Error creando usuario:', error);
-        throw error;
-      }
-    }
-
-    async function loadQuizzes() {
-      quizLoading.style.display = 'block';
-      quizError.style.display = 'none';
-      
-      try {
-        console.log('Loading quizzes...');
-        const response = await fetch(`${API_BASE_URL}/api/quizzes/?active_only=true`);
-        
-        if (response.ok) {
-          availableQuizzes = await response.json();
-          console.log('Quizzes loaded:', availableQuizzes.length);
-          
-          // Cargar estado de participación para cada quiz
-          const quizzesWithStatus = await Promise.all(
-            availableQuizzes.map(async (quiz) => {
-              try {
-                const statusResponse = await fetch(`${API_BASE_URL}/api/users/${encodeURIComponent(currentUser.uni)}/quiz/${quiz.id}/status`);
-                if (statusResponse.ok) {
-                  const status = await statusResponse.json();
-                  return { ...quiz, participationStatus: status };
-                } else {
-                  console.warn(`Could not load status for quiz ${quiz.id}`);
-                  return { ...quiz, participationStatus: { status: 'not_started', can_participate: true } };
-                }
-              } catch (error) {
-                console.error(`Error loading status for quiz ${quiz.id}:`, error);
-                return { ...quiz, participationStatus: { status: 'not_started', can_participate: true } };
-              }
-            })
-          );
-          
-          availableQuizzes = quizzesWithStatus;
-          displayQuizzes();
-        } else {
-          const errorText = await response.text();
-          console.error('Error loading quizzes:', response.status, errorText);
-          throw new Error(`Error HTTP: ${response.status}`);
-        }
-      } catch (error) {
-        console.error('Error cargando quizzes:', error);
-        quizError.textContent = 'Error al cargar los quizzes. Inténtalo de nuevo.';
-        quizError.style.display = 'block';
-      } finally {
-        quizLoading.style.display = 'none';
-      }
-    }
-
-    function displayQuizzes() {
-      quizList.innerHTML = '';
-
-      if (availableQuizzes.length === 0) {
-        emptyState.style.display = 'block';
-        return;
-      }
-
-      emptyState.style.display = 'none';
-
-      availableQuizzes.forEach(quiz => {
-        const quizCard = createQuizCard(quiz);
-        quizList.appendChild(quizCard);
-      });
-    }
-
-    function createQuizCard(quiz) {
-      const card = document.createElement('div');
-      card.className = 'quiz-card';
-      
-      const status = quiz.participationStatus;
-      let statusHtml = '';
-      let clickAction = null;
-
-      if (status.status === 'completed') {
-        statusHtml = `
-          <div class="quiz-status" style="background: rgba(16, 185, 129, 0.1); color: var(--success);">
-            ✓ Completado (${status.score}/${status.total_questions})
-          </div>
-          <span style="color: var(--text-muted);">Quiz ya realizado</span>
-        `;
-        card.style.opacity = '0.7';
-        card.style.cursor = 'not-allowed';
-      } else if (status.status === 'in_progress') {
-        statusHtml = `
-          <div class="quiz-status" style="background: rgba(251, 191, 36, 0.1); color: #f59e0b;">
-            ⏳ En progreso (${status.current_score} pts)
-          </div>
-          <span style="color: var(--primary-blue);">Click para continuar</span>
-        `;
-        clickAction = () => startQuiz(quiz.id);
-        card.style.cursor = 'pointer';
+// Load user session from localStorage or cookies
+function loadUserSession() {
+  try {
+    // Try localStorage first
+    const sessionData = localStorage.getItem('conectahoot_session');
+    if (sessionData) {
+      const parsed = JSON.parse(sessionData);
+      if (parsed.expiryTime > Date.now()) {
+        return parsed.user;
       } else {
-        statusHtml = `
-          <div class="quiz-status status-active">Disponible</div>
-          <span>Click para iniciar</span>
-        `;
-        clickAction = () => startQuiz(quiz.id);
-        card.style.cursor = 'pointer';
+        // Session expired, clean it up
+        localStorage.removeItem('conectahoot_session');
       }
+    }
 
-      if (clickAction) {
-        card.onclick = clickAction;
+    // Try cookies as fallback
+    const cookies = document.cookie.split(';');
+    for (let cookie of cookies) {
+      const [name, value] = cookie.trim().split('=');
+      if (name === 'conectahoot_user') {
+        return JSON.parse(decodeURIComponent(value));
       }
-
-      card.innerHTML = `
-        <div class="quiz-title">${quiz.title}</div>
-        <div class="quiz-area">${quiz.area}</div>
-        <div class="quiz-description">${quiz.description || 'Sin descripción disponible'}</div>
-        <div class="quiz-meta">
-          ${statusHtml}
-        </div>
-      `;
-
-      return card;
     }
+  } catch (error) {
+    console.error('Error loading session:', error);
+    // Clean up corrupted session data
+    localStorage.removeItem('conectahoot_session');
+    document.cookie = 'conectahoot_user=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/';
+  }
+  return null;
+}
 
-    function startQuiz(quizId) {
-      console.log('Starting quiz:', quizId, 'for user:', currentUser.uni);
-      
-      // Redirigir a la vista del quiz
-      const params = new URLSearchParams({
-        uni: currentUser.uni,
-        quiz_id: quizId
-      });
-      
-      window.location.href = `quiz.html?${params.toString()}`;
-    }
+// Clear user session
+function clearUserSession() {
+  localStorage.removeItem('conectahoot_session');
+  document.cookie = 'conectahoot_user=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/';
+}
 
-    function showQuizList() {
-      loginScreen.style.display = 'none';
-      quizListScreen.style.display = 'block';
-      
-      userInfo.style.display = 'block';
-      userName.textContent = currentUser.name;
-      userUni.textContent = currentUser.uni;
-    }
-
-    function handleBack() {
-      quizListScreen.style.display = 'none';
-      loginScreen.style.display = 'block';
-      
-      // Reset form
-      uniInput.value = '';
-      nameInput.value = '';
-      nameInput.style.display = 'none';
-      loginBtn.textContent = 'Acceder';
-      loginBtn.disabled = true;
-      hideError();
-      
+// Check for existing session on page load
+function checkExistingSession() {
+  const savedUser = loadUserSession();
+  if (savedUser) {
+    console.log('Found existing session for user:', savedUser.uni);
+    currentUser = savedUser;
+    loadQuizzes().then(() => {
+      showQuizList();
+    }).catch((error) => {
+      console.error('Error loading quizzes from session:', error);
+      // If there's an error, clear the session and show login
+      clearUserSession();
       currentUser = null;
-      availableQuizzes = [];
+      showLoginScreen();
+    });
+  }
+}
+
+// Initialize session check on page load
+window.addEventListener('load', () => {
+  // Check for existing session first
+  checkExistingSession();
+  
+  // Animation
+  document.querySelector('.app').style.opacity = '0';
+  document.querySelector('.app').style.transform = 'translateY(20px)';
+  setTimeout(() => {
+    document.querySelector('.app').style.transition = 'all 0.6s ease';
+    document.querySelector('.app').style.opacity = '1';
+    document.querySelector('.app').style.transform = 'translateY(0)';
+  }, 100);
+});
+
+// Enter key support
+uniInput.addEventListener('keypress', (e) => {
+  if (e.key === 'Enter' && !loginBtn.disabled) {
+    if (nameInput.style.display === 'none') {
+      handleLogin();
+    }
+  }
+});
+
+nameInput.addEventListener('keypress', (e) => {
+  if (e.key === 'Enter' && !loginBtn.disabled) {
+    handleLogin();
+  }
+});
+
+function handleUniInput() {
+  const uni = uniInput.value.trim();
+  loginBtn.disabled = uni.length === 0;
+  hideError();
+  
+  // Solo permitir números y letras
+  // uniInput.value = uni.replace(/[^0-9a-zA-Z]/g, '');
+}
+
+function handleNameInput() {
+  const name = nameInput.value.trim();
+  const uni = uniInput.value.trim();
+  loginBtn.disabled = uni.length === 0 || name.length === 0;
+  hideError();
+}
+
+async function handleLogin() {
+  const uni = uniInput.value.trim();
+  const name = nameInput.value.trim();
+
+  if (!uni) {
+    showError('Por favor ingresa tu UNI');
+    return;
+  }
+
+  loginBtn.disabled = true;
+  loginLoading.style.display = 'block';
+  hideError();
+
+  try {
+    console.log('Attempting to login with UNI:', uni);
+    
+    // Usar el endpoint correcto que espera UNI como string
+    let user = await getUser(uni);
+    
+    if (!user) {
+      // Si el usuario no existe y tenemos nombre, crear usuario
+      if (name) {
+        console.log('Creating new user with UNI:', uni, 'and name:', name);
+        user = await createUser(uni, name);
+      } else {
+        // Mostrar campo de nombre si no existe el usuario
+        nameInput.style.display = 'block';
+        loginBtn.textContent = 'Crear Usuario';
+        showError('Usuario no encontrado. Ingresa tu nombre para crear una cuenta nueva.');
+        return;
+      }
     }
 
-    function showError(message) {
-      loginError.textContent = message;
-      loginError.style.display = 'block';
-    }
+    console.log('User authenticated:', user);
+    currentUser = user;
+    
+    // Save user session
+    saveUserSession(user);
+    
+    await loadQuizzes();
+    showQuizList();
 
-    function hideError() {
-      loginError.style.display = 'none';
-    }
+  } catch (error) {
+    console.error('Error en login:', error);
+    showError('Error al conectar con el servidor. Inténtalo de nuevo.');
+  } finally {
+    loginBtn.disabled = false;
+    loginLoading.style.display = 'none';
+  }
+}
 
-    // Animación de entrada
-    window.addEventListener('load', () => {
-      document.querySelector('.app').style.opacity = '0';
-      document.querySelector('.app').style.transform = 'translateY(20px)';
-      setTimeout(() => {
-        document.querySelector('.app').style.transition = 'all 0.6s ease';
-        document.querySelector('.app').style.opacity = '1';
-        document.querySelector('.app').style.transform = 'translateY(0)';
-      }, 100);
+async function getUser(uni) {
+  try {
+    console.log('Fetching user with UNI:', uni);
+    // FIXED: Use the correct endpoint for getting user by UNI
+    const response = await fetch(`${API_BASE_URL}/api/users/by-uni/${encodeURIComponent(uni)}`);
+    
+    console.log('API Response status:', response.status);
+    
+    if (response.ok) {
+      const user = await response.json();
+      console.log('User found:', user);
+      return user;
+    } else if (response.status === 404) {
+      console.log('User not found');
+      return null; // Usuario no existe
+    } else {
+      const errorText = await response.text();
+      console.error('API Error:', response.status, errorText);
+      throw new Error(`Error HTTP: ${response.status} - ${errorText}`);
+    }
+  } catch (error) {
+    console.error('Error obteniendo usuario:', error);
+    throw error;
+  }
+}
+
+async function createUser(uni, name) {
+  try {
+    console.log('Creating user:', { uni, name });
+    const response = await fetch(`${API_BASE_URL}/api/users/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ uni, name })
     });
 
+    console.log('Create user response status:', response.status);
+
+    if (response.ok) {
+      const user = await response.json();
+      console.log('User created:', user);
+      return user;
+    } else {
+      const errorData = await response.text();
+      console.error('Error creating user:', response.status, errorData);
+      throw new Error(`Error creando usuario: ${response.status} - ${errorData}`);
+    }
+  } catch (error) {
+    console.error('Error creando usuario:', error);
+    throw error;
+  }
+}
+
+async function loadQuizzes() {
+  quizLoading.style.display = 'block';
+  quizError.style.display = 'none';
+  
+  try {
+    console.log('Loading quizzes...');
+    const response = await fetch(`${API_BASE_URL}/api/quizzes/?active_only=true`);
+    
+    if (response.ok) {
+      availableQuizzes = await response.json();
+      console.log('Quizzes loaded:', availableQuizzes.length);
+      
+      // Cargar estado de participación para cada quiz
+      const quizzesWithStatus = await Promise.all(
+        availableQuizzes.map(async (quiz) => {
+          try {
+            const statusResponse = await fetch(`${API_BASE_URL}/api/users/${encodeURIComponent(currentUser.uni)}/quiz/${quiz.id}/status`);
+            if (statusResponse.ok) {
+              const status = await statusResponse.json();
+              return { ...quiz, participationStatus: status };
+            } else {
+              console.warn(`Could not load status for quiz ${quiz.id}`);
+              return { ...quiz, participationStatus: { status: 'not_started', can_participate: true } };
+            }
+          } catch (error) {
+            console.error(`Error loading status for quiz ${quiz.id}:`, error);
+            return { ...quiz, participationStatus: { status: 'not_started', can_participate: true } };
+          }
+        })
+      );
+      
+      availableQuizzes = quizzesWithStatus;
+      displayQuizzes();
+    } else {
+      const errorText = await response.text();
+      console.error('Error loading quizzes:', response.status, errorText);
+      throw new Error(`Error HTTP: ${response.status}`);
+    }
+  } catch (error) {
+    console.error('Error cargando quizzes:', error);
+    quizError.textContent = 'Error al cargar los quizzes. Inténtalo de nuevo.';
+    quizError.style.display = 'block';
+  } finally {
+    quizLoading.style.display = 'none';
+  }
+}
+
+function displayQuizzes() {
+  quizList.innerHTML = '';
+
+  if (availableQuizzes.length === 0) {
+    emptyState.style.display = 'block';
+    return;
+  }
+
+  emptyState.style.display = 'none';
+
+  availableQuizzes.forEach(quiz => {
+    const quizCard = createQuizCard(quiz);
+    quizList.appendChild(quizCard);
+  });
+}
+
+function createQuizCard(quiz) {
+  const card = document.createElement('div');
+  card.className = 'quiz-card';
+  
+  const status = quiz.participationStatus;
+  let statusHtml = '';
+  let clickAction = null;
+
+  if (status.status === 'completed') {
+    statusHtml = `
+      <div class="quiz-status" style="background: rgba(16, 185, 129, 0.1); color: var(--success);">
+        ✓ Completado (${status.score}/${status.total_questions})
+      </div>
+      <span style="color: var(--text-muted);">Quiz ya realizado</span>
+    `;
+    card.style.opacity = '0.7';
+    card.style.cursor = 'not-allowed';
+  } else if (status.status === 'in_progress') {
+    statusHtml = `
+      <div class="quiz-status" style="background: rgba(251, 191, 36, 0.1); color: #f59e0b;">
+        ⏳ En progreso (${status.current_score} pts)
+      </div>
+      <span style="color: var(--primary-blue);">Click para continuar</span>
+    `;
+    clickAction = () => startQuiz(quiz.id);
+    card.style.cursor = 'pointer';
+  } else {
+    statusHtml = `
+      <div class="quiz-status status-active">Disponible</div>
+      <span>Click para iniciar</span>
+    `;
+    clickAction = () => startQuiz(quiz.id);
+    card.style.cursor = 'pointer';
+  }
+
+  if (clickAction) {
+    card.onclick = clickAction;
+  }
+
+  card.innerHTML = `
+    <div class="quiz-title">${quiz.title}</div>
+    <div class="quiz-area">${quiz.area}</div>
+    <div class="quiz-description">${quiz.description || 'Sin descripción disponible'}</div>
+    <div class="quiz-meta">
+      ${statusHtml}
+    </div>
+  `;
+
+  return card;
+}
+
+function startQuiz(quizId) {
+  console.log('Starting quiz:', quizId, 'for user:', currentUser.uni);
+  
+  // Redirigir a la vista del quiz
+  const params = new URLSearchParams({
+    uni: currentUser.uni,
+    quiz_id: quizId
+  });
+  
+  window.location.href = `quiz.html?${params.toString()}`;
+}
+
+function showQuizList() {
+  loginScreen.style.display = 'none';
+  quizListScreen.style.display = 'block';
+  
+  userInfo.style.display = 'block';
+  userName.textContent = currentUser.name;
+  userUni.textContent = currentUser.uni;
+}
+
+function showLoginScreen() {
+  quizListScreen.style.display = 'none';
+  loginScreen.style.display = 'block';
+  
+  // Reset form
+  uniInput.value = '';
+  nameInput.value = '';
+  nameInput.style.display = 'none';
+  loginBtn.textContent = 'Acceder';
+  loginBtn.disabled = true;
+  hideError();
+  
+  currentUser = null;
+  availableQuizzes = [];
+}
+
+function showError(message) {
+  loginError.textContent = message;
+  loginError.style.display = 'block';
+}
+
+function hideError() {
+  loginError.style.display = 'none';
+}
   </script>
 </body>
 </html>
