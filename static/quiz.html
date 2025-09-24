@@ -840,15 +840,8 @@
 
       try {
         // Completar participación
-        const response = await fetch(`${API_BASE_URL}/api/participations/`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            user_uni: currentUser.uni,
-            quiz_id: currentQuiz.id
-          })
+        const response = await fetch(`${API_BASE_URL}/api/participate/${currentQuiz.id}?uni=${encodeURIComponent(currentUser.uni)}`, {
+          method: 'POST'
         });
 
         if (response.ok) {
