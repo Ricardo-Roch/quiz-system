@@ -175,6 +175,16 @@ class ParticipationOut(BaseModel):
     started_at: datetime
     completed_at: Optional[datetime]
 
+# Pydantic Models adicionales
+class QuestionUpdate(BaseModel):
+    question_text: Optional[str] = None
+    question_order: Optional[int] = None
+    time_limit: Optional[int] = None
+    answers: Optional[List[AnswerCreate]] = None
+
+class UserUpdate(BaseModel):
+    name: Optional[str] = None
+
 # Create tables
 Base.metadata.create_all(bind=engine)
 
@@ -485,6 +495,228 @@ def complete_participation(participation_id: int, db: Session = Depends(get_db))
         "total_questions": participation.total_questions,
         "percentage": round((participation.score / participation.total_questions) * 100, 2)
     }
+
+# User endpoints adicionales
+@app.get("/api/users/", response_model=List[UserOut])
+def get_all_users(db: Session = Depends(get_db)):
+    """Obtener todos los usuarios"""
+    users = db.query(User).all()
+    return users
+
+@app.put("/api/users/{user_id}", response_model=UserOut)
+def update_user(user_id: int, user_update: UserUpdate, db: Session = Depends(get_db)):
+    """Actualizar un usuario existente"""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    for field, value in user_update.dict(exclude_unset=True).items():
+        setattr(user, field, value)
+    
+    db.commit()
+    db.refresh(user)
+    return user
+
+@app.delete("/api/users/{user_id}")
+def delete_user(user_id: int, db: Session = Depends(get_db)):
+    """Eliminar un usuario"""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    db.delete(user)
+    db.commit()
+    return {"message": "Usuario eliminado exitosamente"}
+
+# Question endpoints adicionales
+@app.get("/api/questions/{question_id}")
+def get_question(question_id: int, db: Session = Depends(get_db)):
+    """Obtener una pregunta específica con sus respuestas"""
+    question = db.query(Question).filter(Question.id == question_id).first()
+    if not question:
+        raise HTTPException(status_code=404, detail="Pregunta no encontrada")
+    
+    answers = [{"id": a.id, "answer_text": a.answer_text, "is_correct": a.is_correct, "answer_order": a.answer_order} 
+              for a in sorted(question.answers, key=lambda x: x.answer_order)]
+    
+    return {
+        "id": question.id,
+        "question_text": question.question_text,
+        "question_order": question.question_order,
+        "time_limit": question.time_limit,
+        "answers": answers
+    }
+
+@app.put("/api/questions/{question_id}")
+def update_question(question_id: int, question_update: QuestionUpdate, db: Session = Depends(get_db)):
+    """Actualizar una pregunta existente"""
+    question = db.query(Question).filter(Question.id == question_id).first()
+    if not question:
+        raise HTTPException(status_code=404, detail="Pregunta no encontrada")
+    
+    # Actualizar campos básicos de la pregunta
+    if question_update.question_text is not None:
+        question.question_text = question_update.question_text
+    if question_update.question_order is not None:
+        question.question_order = question_update.question_order
+    if question_update.time_limit is not None:
+        question.time_limit = question_update.time_limit
+    
+    # Si se proporcionan nuevas respuestas, eliminar las anteriores y crear las nuevas
+    if question_update.answers is not None:
+        # Eliminar respuestas anteriores
+        db.query(Answer).filter(Answer.question_id == question_id).delete()
+        
+        # Crear nuevas respuestas
+        for answer in question_update.answers:
+            db_answer = Answer(
+                question_id=question_id,
+                answer_text=answer.answer_text,
+                is_correct=answer.is_correct,
+                answer_order=answer.answer_order
+            )
+            db.add(db_answer)
+    
+    db.commit()
+    db.refresh(question)
+    return {"message": "Pregunta actualizada exitosamente"}
+
+@app.delete("/api/questions/{question_id}")
+def delete_question(question_id: int, db: Session = Depends(get_db)):
+    """Eliminar una pregunta"""
+    question = db.query(Question).filter(Question.id == question_id).first()
+    if not question:
+        raise HTTPException(status_code=404, detail="Pregunta no encontrada")
+    
+    db.delete(question)
+    db.commit()
+    return {"message": "Pregunta eliminada exitosamente"}
+
+# Statistics endpoints
+@app.get("/api/statistics/dashboard")
+def get_dashboard_statistics(db: Session = Depends(get_db)):
+    """Obtener estadísticas para el dashboard"""
+    total_quizzes = db.query(Quiz).count()
+    active_quizzes = db.query(Quiz).filter(Quiz.is_active == True).count()
+    total_users = db.query(User).count()
+    total_participations = db.query(Participation).count()
+    completed_participations = db.query(Participation).filter(Participation.completed == True).count()
+    
+    return {
+        "total_quizzes": total_quizzes,
+        "active_quizzes": active_quizzes,
+        "inactive_quizzes": total_quizzes - active_quizzes,
+        "total_users": total_users,
+        "total_participations": total_participations,
+        "completed_participations": completed_participations,
+        "completion_rate": round((completed_participations / total_participations * 100), 2) if total_participations > 0 else 0
+    }
+
+@app.get("/api/statistics/quiz/{quiz_id}")
+def get_quiz_statistics(quiz_id: int, db: Session = Depends(get_db)):
+    """Obtener estadísticas específicas de un quiz"""
+    quiz = db.query(Quiz).filter(Quiz.id == quiz_id).first()
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz no encontrado")
+    
+    participations = db.query(Participation).filter(Participation.quiz_id == quiz_id).all()
+    completed_participations = [p for p in participations if p.completed]
+    
+    total_participations = len(participations)
+    total_completed = len(completed_participations)
+    
+    if total_completed > 0:
+        avg_score = sum(p.score for p in completed_participations) / total_completed
+        avg_percentage = sum((p.score / p.total_questions * 100) for p in completed_participations) / total_completed
+    else:
+        avg_score = 0
+        avg_percentage = 0
+    
+    return {
+        "quiz_id": quiz_id,
+        "quiz_title": quiz.title,
+        "total_participations": total_participations,
+        "completed_participations": total_completed,
+        "completion_rate": round((total_completed / total_participations * 100), 2) if total_participations > 0 else 0,
+        "average_score": round(avg_score, 2),
+        "average_percentage": round(avg_percentage, 2),
+        "total_questions": len(quiz.questions)
+    }
+
+# Participation management endpoints
+@app.get("/api/participations/")
+def get_all_participations(completed_only: bool = False, db: Session = Depends(get_db)):
+    """Obtener todas las participaciones"""
+    query = db.query(Participation)
+    if completed_only:
+        query = query.filter(Participation.completed == True)
+    
+    participations = query.all()
+    
+    result = []
+    for p in participations:
+        result.append({
+            "id": p.id,
+            "user_name": p.user.name,
+            "user_uni": p.user.uni,
+            "quiz_title": p.quiz.title,
+            "score": p.score,
+            "total_questions": p.total_questions,
+            "percentage": round((p.score / p.total_questions * 100), 2) if p.total_questions > 0 else 0,
+            "completed": p.completed,
+            "started_at": p.started_at,
+            "completed_at": p.completed_at
+        })
+    
+    return result
+
+@app.delete("/api/participations/{participation_id}")
+def delete_participation(participation_id: int, db: Session = Depends(get_db)):
+    """Eliminar una participación"""
+    participation = db.query(Participation).filter(Participation.id == participation_id).first()
+    if not participation:
+        raise HTTPException(status_code=404, detail="Participación no encontrada")
+    
+    db.delete(participation)
+    db.commit()
+    return {"message": "Participación eliminada exitosamente"}
+
+# Bulk operations
+@app.post("/api/quizzes/bulk-toggle")
+def bulk_toggle_quizzes(quiz_ids: List[int], is_active: bool, db: Session = Depends(get_db)):
+    """Activar/desactivar múltiples quizzes"""
+    updated = db.query(Quiz).filter(Quiz.id.in_(quiz_ids)).update(
+        {Quiz.is_active: is_active}, synchronize_session=False
+    )
+    db.commit()
+    
+    return {"message": f"{updated} quizzes {'activados' if is_active else 'desactivados'} exitosamente"}
+
+@app.delete("/api/quizzes/bulk-delete")
+def bulk_delete_quizzes(quiz_ids: List[int], db: Session = Depends(get_db)):
+    """Eliminar múltiples quizzes"""
+    deleted = db.query(Quiz).filter(Quiz.id.in_(quiz_ids)).delete(synchronize_session=False)
+    db.commit()
+    
+    return {"message": f"{deleted} quizzes eliminados exitosamente"}
+
+# Advanced search endpoints
+@app.get("/api/users/search")
+def search_users(q: str, db: Session = Depends(get_db)):
+    """Buscar usuarios por nombre o UNI"""
+    users = db.query(User).filter(
+        (User.name.ilike(f"%{q}%")) | (User.uni.ilike(f"%{q}%"))
+    ).all()
+    return users
+
+@app.get("/api/quizzes/search")
+def search_quizzes(q: str, db: Session = Depends(get_db)):
+    """Buscar quizzes por título o área"""
+    quizzes = db.query(Quiz).filter(
+        (Quiz.title.ilike(f"%{q}%")) | (Quiz.area.ilike(f"%{q}%"))
+    ).all()
+    return quizzes
+
 
 # QR Code generation
 @app.get("/api/generate-qr/{quiz_id}")
