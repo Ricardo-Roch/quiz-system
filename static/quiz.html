@@ -259,6 +259,7 @@
       font-weight:600;
       display:inline-block;
       margin-bottom:24px;
+      visibility: hidden; /* Oculto hasta que se carguen los datos */
     }
 
     .user-badge{
@@ -270,6 +271,7 @@
       font-weight: 600;
       display: inline-block;
       margin-bottom: 16px;
+      visibility: hidden; /* Oculto hasta que se carguen los datos */
     }
     
     .results{
@@ -379,6 +381,15 @@
       border-color: var(--primary-blue);
       color: var(--primary-blue);
     }
+
+    /* Ocultar header info hasta que se carguen los datos */
+    .header-info {
+      visibility: hidden;
+    }
+
+    .header-info.loaded {
+      visibility: visible;
+    }
     
     @media(max-width:600px){
       .answers{grid-template-columns:1fr}
@@ -396,7 +407,7 @@
   <div class="app" role="main">
     <header>
       <img src="logoHoot.jpeg" alt="Logo" class="logo" />
-      <div>
+      <div class="header-info">
         <div id="headerTitle" class="quiz-info"></div>
         <div class="subtitle" id="headerSubtitle"></div>
       </div>
@@ -407,11 +418,11 @@
       <!-- Pantalla de Inicio del Quiz -->
       <div id="startScreen" class="start-screen">
         <div class="user-badge" id="userBadge"></div>
-        <h2 id="quizTitle">Cargando quiz...</h2>
+        <h2 id="quizTitle">Preparando tu quiz...</h2>
         <div class="quiz-header">
           <div class="quiz-area" id="quizArea"></div>
         </div>
-        <p id="quizDescription">Cargando información del quiz...</p>
+        <p id="quizDescription">Un momento por favor...</p>
         
         <div id="quizStats" style="display:none; margin: 24px 0; color: var(--text-secondary);">
           <div>Preguntas: <strong id="totalQuestions">0</strong></div>
@@ -487,6 +498,7 @@
     const results = document.getElementById('results');
     const headerTitle = document.getElementById('headerTitle');
     const headerSubtitle = document.getElementById('headerSubtitle');
+    const headerInfo = document.querySelector('.header-info');
     const userBadge = document.getElementById('userBadge');
     const quizTitle = document.getElementById('quizTitle');
     const quizArea = document.getElementById('quizArea');
@@ -594,12 +606,15 @@
     function setupQuizScreen() {
       loadingDiv.style.display = 'none';
       
-      // Header
+      // Header - Mostrar solo cuando esté cargado
       headerTitle.textContent = currentQuiz.title;
       headerSubtitle.textContent = `${currentQuiz.area} • ${questions.length} preguntas`;
+      headerInfo.classList.add('loaded');
       
-      // Pantalla de inicio
+      // Pantalla de inicio - Mostrar elementos cuando estén listos
       userBadge.textContent = `${currentUser.name} (${currentUser.uni})`;
+      userBadge.style.visibility = 'visible';
+      
       quizTitle.textContent = currentQuiz.title;
       quizArea.textContent = currentQuiz.area;
       quizDescription.textContent = currentQuiz.description || 'Quiz de conocimientos';
