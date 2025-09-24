@@ -633,7 +633,7 @@
       
       try {
         // Iniciar participación
-        const response = await fetch(`${API_BASE_URL}/api/participations/${participationId}/complete`, {
+        const response = await fetch(`${API_BASE_URL}/api/participate/${currentQuiz.id}?uni=${encodeURIComponent(currentUser.uni)}`, {
           method: 'POST'
         });
 
@@ -758,7 +758,7 @@
 
       try {
         // Enviar respuesta
-        const response = await fetch(`${API_BASE_URL}/api/participations/${participationId}/answers`, {
+        const response = await fetch(`${API_BASE_URL}/api/participate/${participationId}/submit`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
@@ -840,7 +840,7 @@
 
       try {
         // Completar participación
-        const response = await fetch(`${API_BASE_URL}/api/participate/${currentQuiz.id}?uni=${encodeURIComponent(currentUser.uni)}`, {
+        const response = await fetch(`${API_BASE_URL}/api/participate/${participationId}/complete`, {
           method: 'POST'
         });
 
