@@ -936,16 +936,70 @@
       }
     }
     
-    async function loadUsers() {
-      // Note: The API doesn't have a get all users endpoint, so we'll show a message
-      document.getElementById('usersList').innerHTML = `
-        <div style="text-align: center; padding: 40px; color: var(--text-secondary);">
-          <p>La gestión de usuarios se realiza a través del sistema de registro.</p>
-          <p>Los usuarios se crean automáticamente cuando acceden por primera vez.</p>
-          <p>Puedes crear usuarios manualmente usando el botón "Agregar Usuario" de arriba.</p>
-        </div>
-      `;
+async function loadUsers() {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/users/`);
+    const users = await response.json();
+
+    if (users.length === 0) {
+      document.getElementById('usersList').innerHTML = '<p>No hay usuarios registrados</p>';
+      return;
     }
+
+    const html = `
+      <table class="table">
+        <thead>
+          <tr>
+            <th>UNI</th>
+            <th>Nombre</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${users.map(user => `
+            <tr>
+              <td>${user.uni}</td>
+              <td>${user.name}</td>
+              <td>
+                <button class="btn btn-small btn-primary" onclick="editUser(${user.id})">Editar</button>
+                <button class="btn btn-small btn-danger" onclick="deleteUser(${user.id})">Eliminar</button>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+
+    document.getElementById('usersList').innerHTML = html;
+
+  } catch (error) {
+    console.error('Error loading users:', error);
+    document.getElementById('usersList').innerHTML = '<div class="error">Error al cargar usuarios</div>';
+  }
+}
+
+function editUser(userId) {
+  fetch(`${API_BASE_URL}/api/users/${userId}`)
+    .then(res => res.json())
+    .then(user => openUserModal(user))
+    .catch(err => alert('Error al cargar usuario'));
+}
+
+async function deleteUser(userId) {
+  if (!confirm('¿Estás seguro de eliminar este usuario?')) return;
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/users/${userId}`, { method: 'DELETE' });
+    if (res.ok) {
+      showSuccess('Usuario eliminado exitosamente');
+      loadUsers();
+    } else {
+      throw new Error('Error al eliminar usuario');
+    }
+  } catch (error) {
+    console.error(error);
+    alert('No se pudo eliminar el usuario');
+  }
+}
     
     // Quiz Management Functions
     function openQuizModal(quiz = null) {
@@ -1026,7 +1080,28 @@
         alert('Error al guardar el quiz');
       }
     }
-    
+    function editQuestion(questionId) {
+  fetch(`${API_BASE_URL}/api/questions/${questionId}`)
+    .then(res => res.json())
+    .then(question => openQuestionModal(question))
+    .catch(err => alert('Error al cargar pregunta'));
+}
+
+async function deleteQuestion(questionId) {
+  if (!confirm('¿Eliminar esta pregunta?')) return;
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/questions/${questionId}`, { method: 'DELETE' });
+    if (res.ok) {
+      showSuccess('Pregunta eliminada');
+      loadQuestions();
+    } else {
+      throw new Error('Error al eliminar pregunta');
+    }
+  } catch (error) {
+    console.error(error);
+    alert('No se pudo eliminar la pregunta');
+  }
+}
     async function toggleQuizStatus(quizId, newStatus) {
       try {
         const response = await fetch(`${API_BASE_URL}/api/quizzes/${quizId}`, {
