@@ -746,7 +746,120 @@ def generate_qr(quiz_id: int, db: Session = Depends(get_db)):
         "qr_code": f"data:image/png;base64,{img_str}",
         "url": quiz_url
     }
+# Agregar estos endpoints a tu FastAPI
 
+@app.get("/api/quizzes/{quiz_id}/participations")
+def get_quiz_participations(quiz_id: int, db: Session = Depends(get_db)):
+    """Obtener participaciones de un quiz específico"""
+    participations = db.query(Participation).filter(
+        Participation.quiz_id == quiz_id,
+        Participation.completed == True
+    ).all()
+    
+    result = []
+    for p in participations:
+        result.append({
+            "id": p.id,
+            "user_name": p.user.name,
+            "user_uni": p.user.uni,
+            "quiz_title": p.quiz.title,
+            "score": p.score,
+            "total_questions": p.total_questions,
+            "percentage": round((p.score / p.total_questions * 100), 2) if p.total_questions > 0 else 0,
+            "completed": p.completed,
+            "started_at": p.started_at,
+            "completed_at": p.completed_at
+        })
+    
+    return result
+
+@app.get("/api/participations/{participation_id}/responses")
+def get_participation_responses(participation_id: int, db: Session = Depends(get_db)):
+    """Obtener respuestas detalladas de una participación"""
+    participation = db.query(Participation).filter(Participation.id == participation_id).first()
+    if not participation:
+        raise HTTPException(status_code=404, detail="Participación no encontrada")
+    
+    responses = db.query(UserResponse).filter(
+        UserResponse.participation_id == participation_id
+    ).all()
+    
+    result = []
+    for response in responses:
+        # Obtener información de la pregunta y respuesta
+        question = db.query(Question).filter(Question.id == response.question_id).first()
+        answer = db.query(Answer).filter(Answer.id == response.answer_id).first()
+        
+        result.append({
+            "id": response.id,
+            "question_id": response.question_id,
+            "question_order": question.question_order if question else 0,
+            "question_text": question.question_text if question else "N/A",
+            "answer_id": response.answer_id,
+            "answer_text": answer.answer_text if answer else "N/A",
+            "is_correct": response.is_correct,
+            "response_time": response.response_time,
+            "answered_at": response.answered_at
+        })
+    
+    return sorted(result, key=lambda x: x["question_order"])
+
+# Agrega estos endpoints a tu main.py después de los endpoints existentes
+
+@app.get("/api/quizzes/{quiz_id}/participations")
+def get_quiz_participations(quiz_id: int, db: Session = Depends(get_db)):
+    """Obtener participaciones de un quiz específico"""
+    participations = db.query(Participation).filter(
+        Participation.quiz_id == quiz_id,
+        Participation.completed == True
+    ).all()
+    
+    result = []
+    for p in participations:
+        result.append({
+            "id": p.id,
+            "user_name": p.user.name,
+            "user_uni": p.user.uni,
+            "quiz_title": p.quiz.title,
+            "score": p.score,
+            "total_questions": p.total_questions,
+            "percentage": round((p.score / p.total_questions * 100), 2) if p.total_questions > 0 else 0,
+            "completed": p.completed,
+            "started_at": p.started_at,
+            "completed_at": p.completed_at
+        })
+    
+    return result
+
+@app.get("/api/participations/{participation_id}/responses")
+def get_participation_responses(participation_id: int, db: Session = Depends(get_db)):
+    """Obtener respuestas detalladas de una participación"""
+    participation = db.query(Participation).filter(Participation.id == participation_id).first()
+    if not participation:
+        raise HTTPException(status_code=404, detail="Participación no encontrada")
+    
+    responses = db.query(UserResponse).filter(
+        UserResponse.participation_id == participation_id
+    ).all()
+    
+    result = []
+    for response in responses:
+        question = db.query(Question).filter(Question.id == response.question_id).first()
+        answer = db.query(Answer).filter(Answer.id == response.answer_id).first()
+        
+        result.append({
+            "id": response.id,
+            "question_id": response.question_id,
+            "question_order": question.question_order if question else 0,
+            "question_text": question.question_text if question else "N/A",
+            "answer_id": response.answer_id,
+            "answer_text": answer.answer_text if answer else "N/A",
+            "is_correct": response.is_correct,
+            "response_time": response.response_time,
+            "answered_at": response.answered_at
+        })
+    
+    return sorted(result, key=lambda x: x["question_order"])
 # Health check
 @app.get("/")
 def health_check():
