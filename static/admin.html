@@ -153,7 +153,7 @@
     
     .card-header{
       display: flex;
-      justify-content: between;
+      justify-content: space-between;
       align-items: center;
       margin-bottom: 20px;
     }
@@ -843,16 +843,10 @@
     
     async function loadDashboard() {
       try {
-        // Load statistics
-        const [quizzesResponse, usersResponse] = await Promise.all([
-          fetch(`${API_BASE_URL}/api/quizzes/`),
-          fetch(`${API_BASE_URL}/api/users/`) // This endpoint might not exist, we'll handle it
-        ]);
-        
-        const quizzes = await quizzesResponse.json();
+        const response = await fetch(`${API_BASE_URL}/api/quizzes/`);
+        const quizzes = await response.json();
         const activeQuizzes = quizzes.filter(q => q.is_active);
         
-        // For now, we'll show basic stats
         const statsHtml = `
           <div class="stat-card">
             <div class="stat-number">${quizzes.length}</div>
@@ -870,7 +864,6 @@
         
         document.getElementById('statsGrid').innerHTML = statsHtml;
         
-        // Load recent activity (recent quizzes)
         const recentHtml = quizzes.slice(0, 5).map(quiz => `
           <div style="padding: 12px 0; border-bottom: 1px solid var(--border);">
             <strong>${quiz.title}</strong> - ${quiz.area}
@@ -936,70 +929,83 @@
       }
     }
     
-async function loadUsers() {
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/users/`);
-    const users = await response.json();
+    async function loadUsers() {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/users/`);
+        const users = await response.json();
 
-    if (users.length === 0) {
-      document.getElementById('usersList').innerHTML = '<p>No hay usuarios registrados</p>';
-      return;
+        if (users.length === 0) {
+          document.getElementById('usersList').innerHTML = '<p>No hay usuarios registrados</p>';
+          return;
+        }
+
+        const html = `
+          <table class="table">
+            <thead>
+              <tr>
+                <th>UNI</th>
+                <th>Nombre</th>
+                <th>Fecha Registro</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${users.map(user => `
+                <tr>
+                  <td>${user.uni}</td>
+                  <td>${user.name}</td>
+                  <td>${new Date(user.created_at).toLocaleDateString()}</td>
+                  <td>
+                    <button class="btn btn-small btn-primary" onclick="editUser(${user.id})">Editar</button>
+                    <button class="btn btn-small btn-danger" onclick="deleteUser(${user.id})">Eliminar</button>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `;
+
+        document.getElementById('usersList').innerHTML = html;
+
+      } catch (error) {
+        console.error('Error loading users:', error);
+        document.getElementById('usersList').innerHTML = '<div class="error">Error al cargar usuarios</div>';
+      }
     }
 
-    const html = `
-      <table class="table">
-        <thead>
-          <tr>
-            <th>UNI</th>
-            <th>Nombre</th>
-            <th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${users.map(user => `
-            <tr>
-              <td>${user.uni}</td>
-              <td>${user.name}</td>
-              <td>
-                <button class="btn btn-small btn-primary" onclick="editUser(${user.id})">Editar</button>
-                <button class="btn btn-small btn-danger" onclick="deleteUser(${user.id})">Eliminar</button>
-              </td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-    `;
-
-    document.getElementById('usersList').innerHTML = html;
-
-  } catch (error) {
-    console.error('Error loading users:', error);
-    document.getElementById('usersList').innerHTML = '<div class="error">Error al cargar usuarios</div>';
-  }
-}
-
-function editUser(userId) {
-  fetch(`${API_BASE_URL}/api/users/${userId}`)
-    .then(res => res.json())
-    .then(user => openUserModal(user))
-    .catch(err => alert('Error al cargar usuario'));
-}
-
-async function deleteUser(userId) {
-  if (!confirm('¿Estás seguro de eliminar este usuario?')) return;
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/users/${userId}`, { method: 'DELETE' });
-    if (res.ok) {
-      showSuccess('Usuario eliminado exitosamente');
-      loadUsers();
-    } else {
-      throw new Error('Error al eliminar usuario');
+    async function editUser(userId) {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/users/`);
+        const users = await response.json();
+        const user = users.find(u => u.id === userId);
+        
+        if (user) {
+          openUserModal(user);
+        } else {
+          throw new Error('Usuario no encontrado');
+        }
+      } catch (error) {
+        console.error('Error loading user:', error);
+        alert('Error al cargar usuario');
+      }
     }
-  } catch (error) {
-    console.error(error);
-    alert('No se pudo eliminar el usuario');
-  }
-}
+
+    async function deleteUser(userId) {
+      if (!confirm('¿Estás seguro de eliminar este usuario?')) return;
+      
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/users/${userId}`, { method: 'DELETE' });
+        if (res.ok) {
+          showSuccess('Usuario eliminado exitosamente');
+          loadUsers();
+        } else {
+          throw new Error('Error al eliminar usuario');
+        }
+      } catch (error) {
+        console.error(error);
+        alert('No se pudo eliminar el usuario');
+      }
+    }
     
     // Quiz Management Functions
     function openQuizModal(quiz = null) {
@@ -1018,6 +1024,7 @@ async function deleteUser(userId) {
         title.textContent = 'Agregar Quiz';
         form.reset();
         document.getElementById('quizId').value = '';
+        document.getElementById('quizActive').checked = false;
       }
       
       modal.classList.add('show');
@@ -1048,21 +1055,15 @@ async function deleteUser(userId) {
       try {
         let response;
         if (quizId) {
-          // Update existing quiz
           response = await fetch(`${API_BASE_URL}/api/quizzes/${quizId}`, {
             method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(quizData)
           });
         } else {
-          // Create new quiz
           response = await fetch(`${API_BASE_URL}/api/quizzes/`, {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(quizData)
           });
         }
@@ -1080,35 +1081,12 @@ async function deleteUser(userId) {
         alert('Error al guardar el quiz');
       }
     }
-    function editQuestion(questionId) {
-  fetch(`${API_BASE_URL}/api/questions/${questionId}`)
-    .then(res => res.json())
-    .then(question => openQuestionModal(question))
-    .catch(err => alert('Error al cargar pregunta'));
-}
 
-async function deleteQuestion(questionId) {
-  if (!confirm('¿Eliminar esta pregunta?')) return;
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/questions/${questionId}`, { method: 'DELETE' });
-    if (res.ok) {
-      showSuccess('Pregunta eliminada');
-      loadQuestions();
-    } else {
-      throw new Error('Error al eliminar pregunta');
-    }
-  } catch (error) {
-    console.error(error);
-    alert('No se pudo eliminar la pregunta');
-  }
-}
     async function toggleQuizStatus(quizId, newStatus) {
       try {
         const response = await fetch(`${API_BASE_URL}/api/quizzes/${quizId}`, {
           method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json'
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ is_active: newStatus })
         });
         
@@ -1169,23 +1147,34 @@ async function deleteQuestion(questionId) {
     async function handleUserSubmit(e) {
       e.preventDefault();
       
+      const userId = document.getElementById('userId').value;
       const userData = {
         uni: document.getElementById('userUni').value,
         name: document.getElementById('userName').value
       };
       
       try {
-        const response = await fetch(`${API_BASE_URL}/api/users/`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(userData)
-        });
+        let response;
+        if (userId) {
+          // Update user
+          response = await fetch(`${API_BASE_URL}/api/users/${userId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(userData)
+          });
+        } else {
+          // Create user
+          response = await fetch(`${API_BASE_URL}/api/users/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(userData)
+          });
+        }
         
         if (response.ok) {
           closeModal('userModal');
-          showSuccess('Usuario creado exitosamente');
+          loadUsers();
+          showSuccess(userId ? 'Usuario actualizado exitosamente' : 'Usuario creado exitosamente');
         } else {
           throw new Error('Error en la respuesta del servidor');
         }
@@ -1242,6 +1231,34 @@ async function deleteQuestion(questionId) {
         document.getElementById('questionsList').innerHTML = '<div class="error">Error al cargar preguntas</div>';
       }
     }
+
+    async function editQuestion(questionId) {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/questions/${questionId}`);
+        const question = await response.json();
+        openQuestionModal(question);
+      } catch (error) {
+        console.error('Error loading question:', error);
+        alert('Error al cargar pregunta');
+      }
+    }
+
+    async function deleteQuestion(questionId) {
+      if (!confirm('¿Eliminar esta pregunta?')) return;
+      
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/questions/${questionId}`, { method: 'DELETE' });
+        if (res.ok) {
+          showSuccess('Pregunta eliminada');
+          loadQuestions();
+        } else {
+          throw new Error('Error al eliminar pregunta');
+        }
+      } catch (error) {
+        console.error(error);
+        alert('No se pudo eliminar la pregunta');
+      }
+    }
     
     function openQuestionModal(question = null) {
       const modal = document.getElementById('questionModal');
@@ -1249,6 +1266,9 @@ async function deleteQuestion(questionId) {
       const form = document.getElementById('questionForm');
       
       document.getElementById('questionQuizId').value = currentQuizId;
+      
+      // Reset answer count
+      answerCount = 0;
       
       if (question) {
         title.textContent = 'Editar Pregunta';
@@ -1260,9 +1280,8 @@ async function deleteQuestion(questionId) {
         // Load existing answers
         const container = document.getElementById('answersContainer');
         container.innerHTML = '';
-        answerCount = 0;
         
-        question.answers.forEach(answer => {
+        question.answers.forEach((answer, index) => {
           addAnswerField(answer.answer_text, answer.is_correct);
         });
       } else {
@@ -1271,11 +1290,10 @@ async function deleteQuestion(questionId) {
         document.getElementById('questionId').value = '';
         document.getElementById('questionQuizId').value = currentQuizId;
         
-        // Reset answers
-        document.getElementById('answersContainer').innerHTML = '';
-        answerCount = 0;
+        // Reset answers and add 4 default fields
+        const container = document.getElementById('answersContainer');
+        container.innerHTML = '';
         
-        // Add 4 default answer fields
         for (let i = 0; i < 4; i++) {
           addAnswerField();
         }
@@ -1293,6 +1311,7 @@ async function deleteQuestion(questionId) {
       answerDiv.style.display = 'flex';
       answerDiv.style.gap = '12px';
       answerDiv.style.alignItems = 'center';
+      answerDiv.dataset.answerIndex = answerCount;
       
       answerDiv.innerHTML = `
         <input type="text" class="form-input answer-text" placeholder="Respuesta ${answerCount}" value="${text}" required>
@@ -1317,13 +1336,16 @@ async function deleteQuestion(questionId) {
     async function handleQuestionSubmit(e) {
       e.preventDefault();
       
+      const questionId = document.getElementById('questionId').value;
       const answerTexts = Array.from(document.querySelectorAll('.answer-text')).map(input => input.value);
-      const correctAnswerIndex = parseInt(document.querySelector('input[name="correctAnswer"]:checked')?.value);
+      const correctAnswerRadio = document.querySelector('input[name="correctAnswer"]:checked');
       
-      if (!correctAnswerIndex || answerTexts.some(text => !text.trim())) {
+      if (!correctAnswerRadio || answerTexts.some(text => !text.trim())) {
         alert('Por favor completa todos los campos y marca una respuesta correcta');
         return;
       }
+      
+      const correctAnswerIndex = parseInt(correctAnswerRadio.value);
       
       const answers = answerTexts.map((text, index) => ({
         answer_text: text,
@@ -1339,18 +1361,27 @@ async function deleteQuestion(questionId) {
       };
       
       try {
-        const response = await fetch(`${API_BASE_URL}/api/quizzes/${currentQuizId}/questions`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(questionData)
-        });
+        let response;
+        if (questionId) {
+          // Update existing question
+          response = await fetch(`${API_BASE_URL}/api/questions/${questionId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(questionData)
+          });
+        } else {
+          // Create new question
+          response = await fetch(`${API_BASE_URL}/api/quizzes/${currentQuizId}/questions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(questionData)
+          });
+        }
         
         if (response.ok) {
           closeModal('questionModal');
           loadQuestions();
-          showSuccess('Pregunta guardada exitosamente');
+          showSuccess(questionId ? 'Pregunta actualizada exitosamente' : 'Pregunta creada exitosamente');
         } else {
           throw new Error('Error en la respuesta del servidor');
         }
@@ -1367,7 +1398,6 @@ async function deleteQuestion(questionId) {
     }
     
     function showSuccess(message) {
-      // Create a temporary success message
       const successDiv = document.createElement('div');
       successDiv.className = 'success';
       successDiv.textContent = message;
@@ -1375,11 +1405,14 @@ async function deleteQuestion(questionId) {
       successDiv.style.top = '20px';
       successDiv.style.right = '20px';
       successDiv.style.zIndex = '9999';
+      successDiv.style.maxWidth = '300px';
       
       document.body.appendChild(successDiv);
       
       setTimeout(() => {
-        document.body.removeChild(successDiv);
+        if (document.body.contains(successDiv)) {
+          document.body.removeChild(successDiv);
+        }
       }, 3000);
     }
     
