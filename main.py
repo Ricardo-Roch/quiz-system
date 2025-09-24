@@ -11,6 +11,17 @@ import io
 import base64
 from typing import List, Optional
 import os
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+@app.get("/")
+def read_index():
+    return FileResponse("static/index.html")
+
+
+
 
 # Database setup
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./quiz_app.db")

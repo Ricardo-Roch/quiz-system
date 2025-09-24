@@ -55,15 +55,7 @@
     
     .logo{
       height: 60px;
-      width: 60px;
-      background: linear-gradient(135deg, var(--primary-red), var(--primary-blue));
-      border-radius: 12px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      font-weight: bold;
-      font-size: 24px;
+      width: auto;
     }
     
     header h1{
@@ -77,6 +69,24 @@
       color:var(--text-secondary);
       font-size:14px;
       font-weight:500;
+    }
+    
+    .brand-footer{
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 1000;
+    }
+    
+    .brand-logo{
+      height: 32px;
+      width: auto;
+      opacity: 0.7;
+      transition: opacity 0.3s ease;
+    }
+    
+    .brand-logo:hover{
+      opacity: 1;
     }
     
     .center{
@@ -330,19 +340,21 @@
     @media(max-width:600px){
       .app{margin:16px; padding:20px}
       .start-screen{padding:24px}
-      .logo{height: 48px; width: 48px; font-size: 20px;}
+      .logo{height: 48px;}
       .start-screen h2{font-size:28px}
       .quiz-list{grid-template-columns: 1fr;}
+      .brand-footer{bottom: 10px; right: 10px;}
+      .brand-logo{height: 24px;}
     }
   </style>
 </head>
 <body>
   <div class="app" role="main">
     <header>
-      <div class="logo">Q</div>
+      <img src="logoHoot.jpeg" alt="Logo" class="logo" />
       <div>
-        <div class="convention-badge">Sistema de Quiz</div>
-        <div class="subtitle">Plataforma de Evaluación Interactiva</div>
+       <!-- <div class="convention-badge">Sistema de Quiz</div>
+        <div class="subtitle">Plataforma de Evaluación Interactiva</div>-->
       </div>
     </header>
 
@@ -350,7 +362,7 @@
 
       <!-- Pantalla de Login -->
       <div id="loginScreen" class="start-screen">
-        <h2>¡Bienvenido al Sistema de Quiz!</h2>
+        <h2>¡Bienvenido al Conectahoot!</h2>
         <p>Ingresa tu número de identificación (UNI) para acceder a los quizzes disponibles</p>
         
         <div style="display: flex; flex-direction: column; gap: 20px; align-items: center;">
@@ -378,7 +390,7 @@
 
       <!-- Pantalla de Quizzes -->
       <div id="quizListScreen" style="display:none;">
-        <button class="back-btn" id="backBtn">← Cambiar Usuario</button>
+       <!-- <button class="back-btn" id="backBtn"> Cambiar Usuario</button>-->
         
         <div id="userInfo" class="user-info" style="display:none;">
           <div class="user-name" id="userName"></div>
@@ -404,9 +416,14 @@
     </main>
   </div>
 
+  <!-- Brand logo in bottom right -->
+  <div class="brand-footer">
+    <img src="logooIO.png" alt="Powered by" class="brand-logo" />
+  </div>
+
   <script>
     // Configuración de la API
-    const API_BASE_URL = 'https://quiz-system-tlff.onrender.com'; // Cambia por tu URL de Render
+    const API_BASE_URL = 'https://quiz-system-sfrf.onrender.com'; // Cambia por tu URL de Render
     
     // Variables globales
     let currentUser = null;
