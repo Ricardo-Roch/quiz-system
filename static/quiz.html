@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Quiz en Progreso — Sistema de Quiz</title>
+  <title>Conecta Hoot</title>
   <style>
     :root{
       --bg-primary: #ffffff;
@@ -55,15 +55,7 @@
     
     .logo{
       height: 60px;
-      width: 60px;
-      background: linear-gradient(135deg, var(--primary-red), var(--primary-blue));
-      border-radius: 12px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      font-weight: bold;
-      font-size: 24px;
+      width: auto;
     }
     
     header h1{
@@ -77,6 +69,24 @@
       color:var(--text-secondary);
       font-size:14px;
       font-weight:500;
+    }
+
+    .brand-footer{
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 1000;
+    }
+    
+    .brand-logo{
+      height: 32px;
+      width: auto;
+      opacity: 0.7;
+      transition: opacity 0.3s ease;
+    }
+    
+    .brand-logo:hover{
+      opacity: 1;
     }
     
     .center{
@@ -374,16 +384,18 @@
       .answers{grid-template-columns:1fr}
       .app{margin:16px; padding:20px}
       .start-screen, .results{padding:24px}
-      .logo{height: 48px; width: 48px; font-size: 20px;}
+      .logo{height: 48px;}
       .start-screen h2{font-size:28px}
       .question{font-size: 20px;}
+      .brand-footer{bottom: 10px; right: 10px;}
+      .brand-logo{height: 24px;}
     }
   </style>
 </head>
 <body>
   <div class="app" role="main">
     <header>
-      <div class="logo">Q</div>
+      <img src="logoHoot.jpeg" alt="Logo" class="logo" />
       <div>
         <div id="headerTitle" class="quiz-info">Cargando quiz...</div>
         <div class="subtitle" id="headerSubtitle">Preparando preguntas...</div>
@@ -446,6 +458,12 @@
 
     </main>
   </div>
+
+  <!-- Brand logo in bottom right -->
+  <div class="brand-footer">
+    <img src="logooIO.png" alt="Powered by" class="brand-logo" />
+  </div>
+
 
   <script>
     // Configuración
