@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, Text, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session, relationship
@@ -195,7 +195,10 @@ app.add_middleware(
 )
 
 # Mount static files
-app.mount("/static", StaticFiles(directory="static"), name="static")
+try:
+    app.mount("/static", StaticFiles(directory="static"), name="static")
+except Exception:
+    pass  # Directory might not exist in deployment
 
 # Dependency
 def get_db():
@@ -205,10 +208,18 @@ def get_db():
     finally:
         db.close()
 
+# Add favicon handler
+@app.get("/favicon.ico")
+def get_favicon():
+    return Response(status_code=204)
+
 # Root endpoint
 @app.get("/")
 def read_root():
-    return FileResponse("static/index.html")
+    try:
+        return FileResponse("static/index.html")
+    except Exception:
+        return {"message": "Quiz System API is running"}
 
 # User endpoints
 @app.post("/api/users/", response_model=UserOut)
@@ -230,7 +241,14 @@ def get_all_users(db: Session = Depends(get_db)):
     users = db.query(User).all()
     return users
 
-@app.get("/api/users/{uni}", response_model=UserOut)
+@app.get("/api/users/{user_id}", response_model=UserOut)
+def get_user_by_id(user_id: int, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    return user
+
+@app.get("/api/users/by-uni/{uni}", response_model=UserOut)
 def get_user_by_uni(uni: str, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.uni == uni).first()
     if not user:
@@ -244,7 +262,8 @@ def update_user(user_id: int, user_update: UserUpdate, db: Session = Depends(get
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     
     for field, value in user_update.dict(exclude_unset=True).items():
-        setattr(user, field, value)
+        if value is not None:
+            setattr(user, field, value)
     
     db.commit()
     db.refresh(user)
@@ -400,32 +419,37 @@ def update_question(question_id: int, question_update: QuestionUpdate, db: Sessi
     if not question:
         raise HTTPException(status_code=404, detail="Pregunta no encontrada")
     
-    # Update basic fields
-    if question_update.question_text is not None:
-        question.question_text = question_update.question_text
-    if question_update.question_order is not None:
-        question.question_order = question_update.question_order
-    if question_update.time_limit is not None:
-        question.time_limit = question_update.time_limit
-    
-    # Update answers if provided
-    if question_update.answers is not None:
-        # Delete old answers
-        db.query(Answer).filter(Answer.question_id == question_id).delete()
+    try:
+        # Update basic fields
+        if question_update.question_text is not None:
+            question.question_text = question_update.question_text
+        if question_update.question_order is not None:
+            question.question_order = question_update.question_order
+        if question_update.time_limit is not None:
+            question.time_limit = question_update.time_limit
         
-        # Create new answers
-        for answer in question_update.answers:
-            db_answer = Answer(
-                question_id=question_id,
-                answer_text=answer.answer_text,
-                is_correct=answer.is_correct,
-                answer_order=answer.answer_order
-            )
-            db.add(db_answer)
-    
-    db.commit()
-    db.refresh(question)
-    return {"message": "Pregunta actualizada exitosamente"}
+        # Update answers if provided
+        if question_update.answers is not None:
+            # Delete old answers
+            db.query(Answer).filter(Answer.question_id == question_id).delete(synchronize_session=False)
+            db.flush()
+            
+            # Create new answers
+            for answer in question_update.answers:
+                db_answer = Answer(
+                    question_id=question_id,
+                    answer_text=answer.answer_text,
+                    is_correct=answer.is_correct,
+                    answer_order=answer.answer_order
+                )
+                db.add(db_answer)
+        
+        db.commit()
+        return {"message": "Pregunta actualizada exitosamente", "question_id": question_id}
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error al actualizar pregunta: {str(e)}")
 
 @app.delete("/api/questions/{question_id}")
 def delete_question(question_id: int, db: Session = Depends(get_db)):
@@ -573,30 +597,45 @@ def complete_participation(participation_id: int, db: Session = Depends(get_db))
         "percentage": round((participation.score / participation.total_questions) * 100, 2) if participation.total_questions > 0 else 0
     }
 
+# FIXED: Participations endpoint with proper error handling
 @app.get("/api/participations/")
 def get_all_participations(completed_only: bool = False, db: Session = Depends(get_db)):
-    query = db.query(Participation)
-    if completed_only:
-        query = query.filter(Participation.completed == True)
-    
-    participations = query.all()
-    
-    result = []
-    for p in participations:
-        result.append({
-            "id": p.id,
-            "user_name": p.user.name,
-            "user_uni": p.user.uni,
-            "quiz_title": p.quiz.title,
-            "score": p.score,
-            "total_questions": p.total_questions,
-            "percentage": round((p.score / p.total_questions * 100), 2) if p.total_questions > 0 else 0,
-            "completed": p.completed,
-            "started_at": p.started_at,
-            "completed_at": p.completed_at
-        })
-    
-    return result
+    try:
+        query = db.query(Participation).join(User).join(Quiz)
+        if completed_only:
+            query = query.filter(Participation.completed == True)
+        
+        participations = query.all()
+        
+        result = []
+        for p in participations:
+            try:
+                # Calculate percentage safely
+                percentage = 0
+                if p.total_questions > 0:
+                    percentage = round((p.score / p.total_questions * 100), 2)
+                
+                result.append({
+                    "id": p.id,
+                    "user_name": p.user.name if p.user else "Unknown",
+                    "user_uni": p.user.uni if p.user else "Unknown",
+                    "quiz_title": p.quiz.title if p.quiz else "Unknown",
+                    "score": p.score,
+                    "total_questions": p.total_questions,
+                    "percentage": percentage,
+                    "completed": p.completed,
+                    "started_at": p.started_at,
+                    "completed_at": p.completed_at
+                })
+            except Exception as e:
+                print(f"Error processing participation {p.id}: {e}")
+                continue
+        
+        return result
+        
+    except Exception as e:
+        print(f"Error in get_all_participations: {e}")
+        raise HTTPException(status_code=500, detail="Error al obtener participaciones")
 
 @app.delete("/api/participations/{participation_id}")
 def delete_participation(participation_id: int, db: Session = Depends(get_db)):
@@ -611,21 +650,30 @@ def delete_participation(participation_id: int, db: Session = Depends(get_db)):
 # Statistics endpoints
 @app.get("/api/statistics/dashboard")
 def get_dashboard_statistics(db: Session = Depends(get_db)):
-    total_quizzes = db.query(Quiz).count()
-    active_quizzes = db.query(Quiz).filter(Quiz.is_active == True).count()
-    total_users = db.query(User).count()
-    total_participations = db.query(Participation).count()
-    completed_participations = db.query(Participation).filter(Participation.completed == True).count()
-    
-    return {
-        "total_quizzes": total_quizzes,
-        "active_quizzes": active_quizzes,
-        "inactive_quizzes": total_quizzes - active_quizzes,
-        "total_users": total_users,
-        "total_participations": total_participations,
-        "completed_participations": completed_participations,
-        "completion_rate": round((completed_participations / total_participations * 100), 2) if total_participations > 0 else 0
-    }
+    try:
+        total_quizzes = db.query(Quiz).count()
+        active_quizzes = db.query(Quiz).filter(Quiz.is_active == True).count()
+        total_users = db.query(User).count()
+        total_participations = db.query(Participation).count()
+        completed_participations = db.query(Participation).filter(Participation.completed == True).count()
+        
+        completion_rate = 0
+        if total_participations > 0:
+            completion_rate = round((completed_participations / total_participations * 100), 2)
+        
+        return {
+            "total_quizzes": total_quizzes,
+            "active_quizzes": active_quizzes,
+            "inactive_quizzes": max(0, total_quizzes - active_quizzes),
+            "total_users": total_users,
+            "total_participations": total_participations,
+            "completed_participations": completed_participations,
+            "completion_rate": completion_rate
+        }
+        
+    except Exception as e:
+        print(f"Error in get_dashboard_statistics: {e}")
+        raise HTTPException(status_code=500, detail="Error al obtener estadísticas")
 
 @app.get("/api/statistics/quiz/{quiz_id}")
 def get_quiz_statistics(quiz_id: int, db: Session = Depends(get_db)):
@@ -674,180 +722,6 @@ def bulk_delete_quizzes(quiz_ids: List[int], db: Session = Depends(get_db)):
     
     return {"message": f"{deleted} quizzes eliminados exitosamente"}
 
-
-# Agrega estos endpoints al backend (después de los endpoints existentes)
-
-# Endpoint para obtener usuario por ID (necesario para edición)
-@app.get("/api/users/{user_id}", response_model=UserOut)
-def get_user_by_id(user_id: int, db: Session = Depends(get_db)):
-    """Obtener usuario por ID"""
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado")
-    return user
-
-# Corregir el endpoint de actualización de usuarios existente
-@app.put("/api/users/{user_id}", response_model=UserOut)
-def update_user(user_id: int, user_update: UserUpdate, db: Session = Depends(get_db)):
-    """Actualizar un usuario existente"""
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado")
-    
-    # Solo actualizar campos no nulos
-    for field, value in user_update.dict(exclude_unset=True).items():
-        if value is not None:  # Verificar que el valor no sea None
-            setattr(user, field, value)
-    
-    db.commit()
-    db.refresh(user)
-    return user
-
-# Nuevo endpoint para manejar edición de preguntas (corrige duplicación)
-@app.put("/api/questions/{question_id}")
-def update_question_fixed(question_id: int, question_update: QuestionUpdate, db: Session = Depends(get_db)):
-    """Actualizar una pregunta existente sin duplicación"""
-    question = db.query(Question).filter(Question.id == question_id).first()
-    if not question:
-        raise HTTPException(status_code=404, detail="Pregunta no encontrada")
-    
-    try:
-        # Iniciar transacción
-        db.begin()
-        
-        # Actualizar campos básicos de la pregunta
-        if question_update.question_text is not None:
-            question.question_text = question_update.question_text
-        if question_update.question_order is not None:
-            question.question_order = question_update.question_order
-        if question_update.time_limit is not None:
-            question.question_limit = question_update.time_limit
-        
-        # Si se proporcionan nuevas respuestas, reemplazar completamente
-        if question_update.answers is not None:
-            # Primero eliminar todas las respuestas existentes
-            db.query(Answer).filter(Answer.question_id == question_id).delete(synchronize_session=False)
-            db.flush()  # Forzar eliminación antes de crear nuevas
-            
-            # Crear nuevas respuestas
-            for answer_data in question_update.answers:
-                new_answer = Answer(
-                    question_id=question_id,
-                    answer_text=answer_data.answer_text,
-                    is_correct=answer_data.is_correct,
-                    answer_order=answer_data.answer_order
-                )
-                db.add(new_answer)
-        
-        # Confirmar todos los cambios
-        db.commit()
-        return {"message": "Pregunta actualizada exitosamente", "question_id": question_id}
-        
-    except Exception as e:
-        # En caso de error, revertir cambios
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error al actualizar pregunta: {str(e)}")
-
-# Endpoint mejorado para obtener un usuario por UNI (evita "undefined")
-@app.get("/api/users/by-uni/{uni}", response_model=UserOut)
-def get_user_by_uni_safe(uni: str, db: Session = Depends(get_db)):
-    """Obtener usuario por UNI con manejo de errores mejorado"""
-    if not uni or uni.strip() == "":
-        raise HTTPException(status_code=400, detail="UNI no puede estar vacío")
-    
-    user = db.query(User).filter(User.uni == uni.strip()).first()
-    if not user:
-        raise HTTPException(status_code=404, detail=f"Usuario con UNI '{uni}' no encontrado")
-    return user
-
-# Endpoint para crear/actualizar usuarios de forma segura
-@app.post("/api/users/", response_model=UserOut)
-def create_or_get_user(user: UserCreate, db: Session = Depends(get_db)):
-    """Crear usuario o devolver existente (evita duplicación)"""
-    # Validar datos de entrada
-    if not user.uni or not user.uni.strip():
-        raise HTTPException(status_code=400, detail="UNI es requerido")
-    if not user.name or not user.name.strip():
-        raise HTTPException(status_code=400, detail="Nombre es requerido")
-    
-    # Buscar usuario existente
-    db_user = db.query(User).filter(User.uni == user.uni.strip()).first()
-    
-    if db_user:
-        # Usuario existe, actualizar nombre si es diferente
-        if db_user.name != user.name.strip():
-            db_user.name = user.name.strip()
-            db.commit()
-            db.refresh(db_user)
-        return db_user
-    
-    # Crear nuevo usuario
-    try:
-        db_user = User(uni=user.uni.strip(), name=user.name.strip())
-        db.add(db_user)
-        db.commit()
-        db.refresh(db_user)
-        return db_user
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error al crear usuario: {str(e)}")
-
-# Endpoint mejorado para obtener estadísticas del dashboard
-@app.get("/api/statistics/dashboard")
-def get_dashboard_statistics_improved(db: Session = Depends(get_db)):
-    """Obtener estadísticas mejoradas para el dashboard"""
-    try:
-        total_quizzes = db.query(Quiz).count()
-        active_quizzes = db.query(Quiz).filter(Quiz.is_active == True).count()
-        total_users = db.query(User).count()
-        total_participations = db.query(Participation).count()
-        completed_participations = db.query(Participation).filter(Participation.completed == True).count()
-        
-        # Calcular tasa de finalización de forma segura
-        completion_rate = 0
-        if total_participations > 0:
-            completion_rate = round((completed_participations / total_participations * 100), 2)
-        
-        return {
-            "total_quizzes": total_quizzes,
-            "active_quizzes": active_quizzes,
-            "inactive_quizzes": max(0, total_quizzes - active_quizzes),
-            "total_users": total_users,
-            "total_participations": total_participations,
-            "completed_participations": completed_participations,
-            "completion_rate": completion_rate
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error al obtener estadísticas: {str(e)}")
-
-# Middleware para manejo de errores CORS mejorado
-@app.middleware("http")
-async def add_cors_headers_improved(request, call_next):
-    """Agregar headers CORS mejorados"""
-    response = await call_next(request)
-    
-    # Headers CORS completos
-    response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With"
-    response.headers["Access-Control-Max-Age"] = "3600"
-    
-    return response
-
-# Handler para solicitudes OPTIONS (preflight)
-@app.options("/{path:path}")
-async def options_handler(path: str):
-    """Manejar solicitudes OPTIONS para CORS preflight"""
-    return Response(
-        status_code=200,
-        headers={
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
-            "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
-            "Access-Control-Max-Age": "3600"
-        }
-    )
-
 # Search endpoints
 @app.get("/api/users/search")
 def search_users(q: str, db: Session = Depends(get_db)):
@@ -891,6 +765,82 @@ def generate_qr(quiz_id: int, db: Session = Depends(get_db)):
         "qr_code": f"data:image/png;base64,{img_str}",
         "url": quiz_url
     }
+
+# Add a new endpoint to get detailed responses for a quiz
+@app.get("/api/quizzes/{quiz_id}/responses")
+def get_quiz_responses(quiz_id: int, db: Session = Depends(get_db)):
+    try:
+        # Get quiz to validate it exists
+        quiz = db.query(Quiz).filter(Quiz.id == quiz_id).first()
+        if not quiz:
+            raise HTTPException(status_code=404, detail="Quiz no encontrado")
+        
+        # Get all user responses for this quiz through participations
+        responses = db.query(UserResponse).join(Participation).join(User).join(Question).join(Answer).filter(
+            Participation.quiz_id == quiz_id
+        ).all()
+        
+        result = []
+        for response in responses:
+            try:
+                result.append({
+                    "user_name": response.participation.user.name,
+                    "user_uni": response.participation.user.uni,
+                    "question_id": response.question_id,
+                    "question_order": response.question.question_order,
+                    "question_text": response.question.question_text,
+                    "answer_text": response.answer.answer_text if response.answer else "No answer",
+                    "is_correct": response.is_correct,
+                    "response_time": response.response_time,
+                    "answered_at": response.answered_at
+                })
+            except AttributeError as e:
+                print(f"Error processing response {response.id}: {e}")
+                continue
+        
+        return result
+        
+    except Exception as e:
+        print(f"Error in get_quiz_responses: {e}")
+        raise HTTPException(status_code=500, detail="Error al obtener respuestas del quiz")
+
+# Middleware for better error handling
+@app.middleware("http")
+async def add_cors_headers_and_error_handling(request, call_next):
+    try:
+        response = await call_next(request)
+        
+        # Add CORS headers
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With"
+        response.headers["Access-Control-Max-Age"] = "3600"
+        
+        return response
+        
+    except Exception as e:
+        print(f"Middleware error: {e}")
+        return Response(
+            content=f"Internal server error: {str(e)}",
+            status_code=500,
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Content-Type": "text/plain"
+            }
+        )
+
+# OPTIONS handler for CORS preflight
+@app.options("/{path:path}")
+async def options_handler(path: str):
+    return Response(
+        status_code=200,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
+            "Access-Control-Max-Age": "3600"
+        }
+    )
 
 if __name__ == "__main__":
     import uvicorn
