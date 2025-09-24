@@ -310,10 +310,44 @@ def create_quiz(quiz: QuizCreate, db: Session = Depends(get_db)):
 
 @app.get("/api/quizzes/", response_model=List[QuizOut])
 def get_quizzes(active_only: bool = False, db: Session = Depends(get_db)):
-    query = db.query(Quiz)
-    if active_only:
-        query = query.filter(Quiz.is_active == True)
-    return query.all()
+    try:
+        query = db.query(Quiz)
+        if active_only:
+            query = query.filter(Quiz.is_active == True)
+        
+        quizzes = query.all()
+        
+        # Convertir a formato de respuesta explícitamente
+        result = []
+        for quiz in quizzes:
+            result.append({
+                "id": quiz.id,
+                "title": quiz.title,
+                "area": quiz.area,
+                "description": quiz.description,
+                "is_active": quiz.is_active,
+                "created_at": quiz.created_at
+            })
+        
+        return result
+        
+    except Exception as e:
+        print(f"Error in get_quizzes: {e}")
+        # Devolver lista vacía en lugar de error 500
+        return []
+    
+@app.get("/api/health")
+def health_check():
+    return {"status": "ok", "message": "API is running"}
+
+@app.get("/api/quizzes/count")
+def get_quizzes_count(db: Session = Depends(get_db)):
+    try:
+        count = db.query(Quiz).count()
+        return {"count": count}
+    except Exception as e:
+        print(f"Database error: {e}")
+        return {"count": 0, "error": str(e)}
 
 @app.get("/api/quizzes/{quiz_id}", response_model=QuizDetailOut)
 def get_quiz(quiz_id: int, db: Session = Depends(get_db)):

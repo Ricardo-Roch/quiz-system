@@ -1015,77 +1015,275 @@
       }
     }
     
-    async function loadDashboard() {
-      try {
-        const response = await fetch(`${API_BASE_URL}/api/quizzes/`);
-        const quizzes = await response.json();
-        const activeQuizzes = quizzes.filter(q => q.is_active);
-        
-        const statsHtml = `
-          <div class="stat-card">
-            <div class="stat-number">${quizzes.length}</div>
-            <div class="stat-label">Total Quizzes</div>
-          </div>
-          <div class="stat-card" style="background: linear-gradient(135deg, var(--success), #059669);">
-            <div class="stat-number">${activeQuizzes.length}</div>
-            <div class="stat-label">Quizzes Activos</div>
-          </div>
-          <div class="stat-card" style="background: linear-gradient(135deg, var(--warning), #d97706);">
-            <div class="stat-number">${quizzes.length - activeQuizzes.length}</div>
-            <div class="stat-label">Quizzes Inactivos</div>
-          </div>
-        `;
-        
-        document.getElementById('statsGrid').innerHTML = statsHtml;
-        
-        // Populate quiz selector
-        const quizSelect = document.getElementById('quizSelect');
-        const quizOptions = quizzes.map(quiz => 
-          `<option value="${quiz.id}">${quiz.title} - ${quiz.area}</option>`
-        ).join('');
-        quizSelect.innerHTML = '<option value="">Selecciona un quiz</option>' + quizOptions;
-        
-        const recentHtml = quizzes.slice(0, 5).map(quiz => `
-          <div style="padding: 12px 0; border-bottom: 1px solid var(--border);">
-            <strong>${quiz.title}</strong> - ${quiz.area}
-            <div style="font-size: 12px; color: var(--text-muted);">
-              ${new Date(quiz.created_at).toLocaleDateString()}
+async function loadDashboard() {
+  try {
+    // Verificar conexión primero
+    const healthResponse = await fetch(`${API_BASE_URL}/api/health`);
+    if (!healthResponse.ok) {
+      throw new Error('Servidor no disponible');
+    }
+    
+    let quizzes = [];
+    let users = [];
+    let participations = [];
+    
+    // Intentar obtener quizzes
+    try {
+      const quizzesResponse = await fetch(`${API_BASE_URL}/api/quizzes/`);
+      if (quizzesResponse.ok) {
+        const quizzesData = await quizzesResponse.json();
+        if (Array.isArray(quizzesData)) {
+          quizzes = quizzesData;
+        }
+      } else {
+        console.warn('Error obteniendo quizzes:', quizzesResponse.status);
+        // Intentar endpoint alternativo
+        const countResponse = await fetch(`${API_BASE_URL}/api/quizzes/count`);
+        if (countResponse.ok) {
+          const countData = await countResponse.json();
+          console.log('Quiz count:', countData);
+        }
+      }
+    } catch (e) {
+      console.warn('Error en fetch quizzes:', e);
+    }
+    
+    // Intentar obtener usuarios (con fallback)
+    try {
+      const usersResponse = await fetch(`${API_BASE_URL}/api/users/`);
+      if (usersResponse.ok) {
+        users = await usersResponse.json();
+      }
+    } catch (e) {
+      console.warn('Error en fetch users:', e);
+    }
+    
+    // Intentar obtener participaciones (con fallback)
+    try {
+      const participationsResponse = await fetch(`${API_BASE_URL}/api/participations/`);
+      if (participationsResponse.ok) {
+        participations = await participationsResponse.json();
+      }
+    } catch (e) {
+      console.warn('Error en fetch participations:', e);
+    }
+    
+    // Mostrar estadísticas con los datos obtenidos
+    const activeQuizzes = quizzes.filter(q => q.is_active);
+    const completedParticipations = participations.filter(p => p.completed);
+    
+    const statsHtml = `
+      <div class="stat-card">
+        <div class="stat-number">${quizzes.length || 0}</div>
+        <div class="stat-label">Total Quizzes</div>
+      </div>
+      <div class="stat-card" style="background: linear-gradient(135deg, var(--success), #059669);">
+        <div class="stat-number">${activeQuizzes.length || 0}</div>
+        <div class="stat-label">Quizzes Activos</div>
+      </div>
+      <div class="stat-card" style="background: linear-gradient(135deg, var(--warning), #d97706);">
+        <div class="stat-number">${users.length || 0}</div>
+        <div class="stat-label">Usuarios</div>
+      </div>
+      <div class="stat-card" style="background: linear-gradient(135deg, var(--accent-red), #dc2626);">
+        <div class="stat-number">${participations.length || 0}</div>
+        <div class="stat-label">Participaciones</div>
+      </div>
+    `;
+    
+    document.getElementById('statsGrid').innerHTML = statsHtml;
+    
+    // Llenar selector de quizzes
+    const quizSelect = document.getElementById('quizSelect');
+    if (quizzes.length > 0) {
+      const quizOptions = quizzes.map(quiz => 
+        `<option value="${quiz.id}">${quiz.title} - ${quiz.area}</option>`
+      ).join('');
+      quizSelect.innerHTML = '<option value="">Selecciona un quiz</option>' + quizOptions;
+    } else {
+      quizSelect.innerHTML = '<option value="">No hay quizzes disponibles</option>';
+    }
+    
+    // Actividad reciente
+    const recentHtml = quizzes.slice(0, 5).map(quiz => `
+      <div style="padding: 12px 0; border-bottom: 1px solid var(--border);">
+        <strong>${quiz.title}</strong> - ${quiz.area}
+        <div style="font-size: 12px; color: var(--text-muted);">
+          ${new Date(quiz.created_at).toLocaleDateString()}
+        </div>
+      </div>
+    `).join('');
+    
+    document.getElementById('recentActivity').innerHTML = recentHtml || '<p>No hay actividad reciente</p>';
+    
+  } catch (error) {
+    console.error('Error loading dashboard:', error);
+    document.getElementById('statsGrid').innerHTML = `
+      <div class="error">
+        Error: ${error.message}
+        <br><small>Verifica que el servidor esté funcionando en ${API_BASE_URL}</small>
+      </div>
+    `;
+  }
+}
+
+    
+
+async function handleQuizSelectChange(e) {
+  const quizId = e.target.value;
+  const leaderboardDiv = document.getElementById('leaderboard');
+  const responsesCard = document.getElementById('responsesCard');
+  
+  if (!quizId) {
+    leaderboardDiv.innerHTML = '<div class="loading">Selecciona un quiz para ver el ranking</div>';
+    responsesCard.style.display = 'none';
+    return;
+  }
+  
+  leaderboardDiv.innerHTML = '<div class="loading">Cargando ranking...</div>';
+  responsesCard.style.display = 'block';
+  document.getElementById('responsesTable').innerHTML = '<div class="loading">Cargando respuestas...</div>';
+  
+  try {
+    // Intentar obtener participaciones del quiz específico
+    let participationsUrl = `${API_BASE_URL}/api/participations/?quiz_id=${quizId}`;
+    let response = await fetch(participationsUrl);
+    
+    // Si falla, intentar endpoint alternativo
+    if (!response.ok) {
+      participationsUrl = `${API_BASE_URL}/api/participations/`;
+      response = await fetch(participationsUrl);
+      
+      if (response.ok) {
+        const allParticipations = await response.json();
+        // Filtrar por quiz_id en el frontend
+        const quizParticipations = allParticipations.filter(p => p.quiz_id == quizId);
+        await loadLeaderboardFromData(quizParticipations);
+      } else {
+        throw new Error('No se pudieron obtener las participaciones');
+      }
+    } else {
+      const participations = await response.json();
+      await loadLeaderboardFromData(participations);
+    }
+    
+  } catch (error) {
+    console.error('Error loading data:', error);
+    leaderboardDiv.innerHTML = `
+      <div class="error">
+        Error al cargar el ranking: ${error.message}
+        <br><small>Es posible que este quiz no tenga participaciones aún.</small>
+      </div>
+    `;
+    document.getElementById('responsesTable').innerHTML = `
+      <div class="error">
+        Error al cargar respuestas: ${error.message}
+      </div>
+    `;
+  }
+}
+async function loadLeaderboardFromData(participations) {
+  try {
+    if (participations.length === 0) {
+      document.getElementById('leaderboard').innerHTML = `
+        <div class="empty-leaderboard">
+          <div class="icon">🏆</div>
+          <h4>No hay participaciones aún</h4>
+          <p>Este quiz aún no ha sido contestado por ningún usuario.</p>
+        </div>
+      `;
+      document.getElementById('responsesTable').innerHTML = '<div class="empty-table">No hay respuestas para mostrar</div>';
+      return;
+    }
+    
+    // Simular ranking basado en score y completed
+    const completedParticipations = participations.filter(p => p.completed);
+    
+    if (completedParticipations.length === 0) {
+      document.getElementById('leaderboard').innerHTML = `
+        <div class="empty-leaderboard">
+          <div class="icon">⏳</div>
+          <h4>Participaciones en progreso</h4>
+          <p>Hay ${participations.length} participaciones iniciadas pero ninguna completada aún.</p>
+        </div>
+      `;
+      return;
+    }
+    
+    // Ordenar por score descendente
+    const rankings = completedParticipations.sort((a, b) => b.score - a.score);
+    
+    // Generar HTML del leaderboard
+    const leaderboardHtml = rankings.map((participant, index) => {
+      const rank = index + 1;
+      const rankClass = rank <= 3 ? `rank-${rank}` : '';
+      const percentage = participant.total_questions > 0 ? 
+        ((participant.score / participant.total_questions) * 100).toFixed(1) : 0;
+      
+      return `
+        <div class="leaderboard-item ${rankClass}">
+          <div class="rank-info">
+            <div class="rank-number">#${rank}</div>
+            <div class="participant-info">
+              <div class="participant-name">${participant.user_name || 'Usuario'}</div>
+              <div class="participant-uni">${participant.user_uni || 'N/A'}</div>
             </div>
           </div>
-        `).join('');
-        
-        document.getElementById('recentActivity').innerHTML = recentHtml || '<p>No hay actividad reciente</p>';
-        
-      } catch (error) {
-        console.error('Error loading dashboard:', error);
-      }
-    }
-
-    async function handleQuizSelectChange(e) {
-      const quizId = e.target.value;
-      const leaderboardDiv = document.getElementById('leaderboard');
-      const responsesCard = document.getElementById('responsesCard');
-      
-      if (!quizId) {
-        leaderboardDiv.innerHTML = '<div class="loading">Selecciona un quiz para ver el ranking</div>';
-        responsesCard.style.display = 'none';
-        return;
-      }
-      
-      leaderboardDiv.innerHTML = '<div class="loading">Cargando ranking...</div>';
-      responsesCard.style.display = 'block';
-      document.getElementById('responsesTable').innerHTML = '<div class="loading">Cargando respuestas...</div>';
-      
-      try {
-        await loadLeaderboard(quizId);
-        await loadResponsesTable(quizId);
-      } catch (error) {
-        console.error('Error loading data:', error);
-        leaderboardDiv.innerHTML = '<div class="error">Error al cargar el ranking</div>';
-        document.getElementById('responsesTable').innerHTML = '<div class="error">Error al cargar respuestas</div>';
-      }
-    }
-
+          <div class="score-info">
+            <div class="total-score">${participant.score}</div>
+            <div class="score-details">
+              ${participant.score}/${participant.total_questions} correctas
+              <br>
+              ${percentage}% precisión
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+    
+    document.getElementById('leaderboard').innerHTML = leaderboardHtml;
+    
+    // Generar tabla de respuestas simplificada
+    const responsesTableHtml = `
+      <div class="responses-table">
+        <table class="table table-striped table-compact">
+          <thead>
+            <tr>
+              <th>Usuario</th>
+              <th>UNI</th>
+              <th>Score</th>
+              <th>Total Preguntas</th>
+              <th>Porcentaje</th>
+              <th>Completado</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rankings.map(participant => `
+              <tr>
+                <td>${participant.user_name || 'N/A'}</td>
+                <td><strong>${participant.user_uni || 'N/A'}</strong></td>
+                <td class="${participant.score > (participant.total_questions / 2) ? 'correct-answer' : 'incorrect-answer'}">
+                  ${participant.score}
+                </td>
+                <td>${participant.total_questions}</td>
+                <td>${((participant.score / participant.total_questions) * 100).toFixed(1)}%</td>
+                <td>${new Date(participant.completed_at).toLocaleString()}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+    
+    document.getElementById('responsesTable').innerHTML = responsesTableHtml;
+    
+  } catch (error) {
+    console.error('Error in loadLeaderboardFromData:', error);
+    document.getElementById('leaderboard').innerHTML = `
+      <div class="error">Error al procesar los datos del ranking</div>
+    `;
+  }
+}
     async function loadLeaderboard(quizId) {
       try {
         // Obtener participaciones del quiz
@@ -1416,54 +1614,76 @@
       return csvRows.join('\n');
     }
     
-    async function loadQuizzes() {
-      try {
-        const response = await fetch(`${API_BASE_URL}/api/quizzes/`);
-        const quizzes = await response.json();
-        
-        const html = `
-          <table class="table">
-            <thead>
-              <tr>
-                <th>Título</th>
-                <th>Área</th>
-                <th>Estado</th>
-                <th>Creado</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${quizzes.map(quiz => `
-                <tr>
-                  <td><strong>${quiz.title}</strong></td>
-                  <td>${quiz.area}</td>
-                  <td>
-                    <span class="status-badge ${quiz.is_active ? 'status-active' : 'status-inactive'}">
-                      ${quiz.is_active ? 'Activo' : 'Inactivo'}
-                    </span>
-                  </td>
-                  <td>${new Date(quiz.created_at).toLocaleDateString()}</td>
-                  <td>
-                    <button class="btn btn-small btn-primary" onclick="editQuiz(${quiz.id})">Editar</button>
-                    <button class="btn btn-small btn-warning" onclick="toggleQuizStatus(${quiz.id}, ${!quiz.is_active})">
-                      ${quiz.is_active ? 'Desactivar' : 'Activar'}
-                    </button>
-                    <button class="btn btn-small btn-success" onclick="manageQuestions(${quiz.id}, '${quiz.title}')">Preguntas</button>
-                    <button class="btn btn-small btn-danger" onclick="deleteQuiz(${quiz.id})">Eliminar</button>
-                  </td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        `;
-        
-        document.getElementById('quizzesList').innerHTML = html;
-        
-      } catch (error) {
-        console.error('Error loading quizzes:', error);
-        document.getElementById('quizzesList').innerHTML = '<div class="error">Error al cargar quizzes</div>';
-      }
+async function loadQuizzes() {
+  try {
+    // Verificar conexión
+    const healthCheck = await fetch(`${API_BASE_URL}/api/health`);
+    if (!healthCheck.ok) {
+      throw new Error('Servidor no disponible');
     }
+    
+    const response = await fetch(`${API_BASE_URL}/api/quizzes/`);
+    
+    let quizzes = [];
+    if (response.ok) {
+      const data = await response.json();
+      if (Array.isArray(data)) {
+        quizzes = data;
+      } else {
+        console.warn('Respuesta no es un array:', data);
+      }
+    } else {
+      console.error('Error HTTP:', response.status);
+    }
+
+    const html = `
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Título</th>
+            <th>Área</th>
+            <th>Estado</th>
+            <th>Creado</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${quizzes.length > 0 ? quizzes.map(quiz => `
+            <tr>
+              <td><strong>${quiz.title}</strong></td>
+              <td>${quiz.area}</td>
+              <td>
+                <span class="status-badge ${quiz.is_active ? 'status-active' : 'status-inactive'}">
+                  ${quiz.is_active ? 'Activo' : 'Inactivo'}
+                </span>
+              </td>
+              <td>${new Date(quiz.created_at).toLocaleDateString()}</td>
+              <td>
+                <button class="btn btn-small btn-primary" onclick="editQuiz(${quiz.id})">Editar</button>
+                <button class="btn btn-small btn-warning" onclick="toggleQuizStatus(${quiz.id}, ${!quiz.is_active})">
+                  ${quiz.is_active ? 'Desactivar' : 'Activar'}
+                </button>
+                <button class="btn btn-small btn-success" onclick="manageQuestions(${quiz.id}, '${quiz.title.replace(/'/g, "\\'")}')">Preguntas</button>
+                <button class="btn btn-small btn-danger" onclick="deleteQuiz(${quiz.id})">Eliminar</button>
+              </td>
+            </tr>
+          `).join('') : '<tr><td colspan="5" style="text-align: center; padding: 40px; color: var(--text-muted);">No hay quizzes registrados</td></tr>'}
+        </tbody>
+      </table>
+    `;
+    
+    document.getElementById('quizzesList').innerHTML = html;
+    
+  } catch (error) {
+    console.error('Error loading quizzes:', error);
+    document.getElementById('quizzesList').innerHTML = `
+      <div class="error">
+        Error: ${error.message}
+        <br><small>Verifica la conexión al servidor</small>
+      </div>
+    `;
+  }
+}
     
     async function loadUsers() {
       try {
