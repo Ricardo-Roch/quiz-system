@@ -449,7 +449,7 @@
 
   <script>
     // Configuración
-    const API_BASE_URL = 'https://quiz-system-sfrf.onrender.com';
+    const API_BASE_URL = 'https://quiz-system-tlff.onrender.com';
     const TIME_PER_QUESTION = 30; // segundos
 
     // Variables del juego
@@ -595,6 +595,7 @@
 
     async function startQuiz() {
       startBtn.disabled = true;
+      startBtn.textContent = 'Iniciando...';
       
       try {
         // Iniciar participación
@@ -619,13 +620,35 @@
           showQuestion();
           
         } else {
-          throw new Error('Error al iniciar participación');
+          const errorData = await response.json();
+          if (response.status === 400) {
+            // Quiz ya completado
+            showCompletedQuizError(errorData.detail);
+          } else {
+            throw new Error(errorData.detail || 'Error al iniciar participación');
+          }
         }
       } catch (error) {
         console.error('Error iniciando quiz:', error);
         showError('Error al iniciar el quiz. Inténtalo de nuevo.');
+      } finally {
         startBtn.disabled = false;
+        startBtn.textContent = 'Comenzar Quiz';
       }
+    }
+
+    function showCompletedQuizError(message) {
+      errorDiv.innerHTML = `
+        <div style="text-align: center;">
+          <div style="font-size: 18px; margin-bottom: 12px;">✅ Quiz Ya Completado</div>
+          <div style="color: var(--text-secondary); margin-bottom: 16px;">${message}</div>
+          <button onclick="goHome()" style="padding: 8px 16px; border-radius: 6px; border: none; background: var(--primary-blue); color: white; cursor: pointer;">
+            Volver al Inicio
+          </button>
+        </div>
+      `;
+      errorDiv.style.display = 'block';
+      startBtn.style.display = 'none';
     }
 
     function showQuestion() {

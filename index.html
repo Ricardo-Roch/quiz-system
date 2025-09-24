@@ -203,12 +203,17 @@
       padding: 24px;
       transition: all 0.3s ease;
       cursor: pointer;
+      position: relative;
     }
 
-    .quiz-card:hover{
+    .quiz-card:hover:not([style*="cursor: not-allowed"]){
       transform: translateY(-5px);
       box-shadow: 0 10px 30px var(--shadow);
       border-color: var(--primary-blue);
+    }
+
+    .quiz-card[style*="cursor: not-allowed"]:hover {
+      transform: none;
     }
 
     .quiz-title{
@@ -401,7 +406,7 @@
 
   <script>
     // Configuración de la API
-    const API_BASE_URL = 'https://quiz-system-sfrf.onrender.com'; // Cambia por tu URL de Render
+    const API_BASE_URL = 'https://quiz-system-tlff.onrender.com'; // Cambia por tu URL de Render
     
     // Variables globales
     let currentUser = null;
@@ -553,6 +558,26 @@
         
         if (response.ok) {
           availableQuizzes = await response.json();
+          
+          // Cargar estado de participación para cada quiz
+          const quizzesWithStatus = await Promise.all(
+            availableQuizzes.map(async (quiz) => {
+              try {
+                const statusResponse = await fetch(`${API_BASE_URL}/api/users/${currentUser.uni}/quiz/${quiz.id}/status`);
+                if (statusResponse.ok) {
+                  const status = await statusResponse.json();
+                  return { ...quiz, participationStatus: status };
+                } else {
+                  return { ...quiz, participationStatus: { status: 'not_started', can_participate: true } };
+                }
+              } catch (error) {
+                console.error(`Error loading status for quiz ${quiz.id}:`, error);
+                return { ...quiz, participationStatus: { status: 'not_started', can_participate: true } };
+              }
+            })
+          );
+          
+          availableQuizzes = quizzesWithStatus;
           displayQuizzes();
         } else {
           throw new Error(`Error HTTP: ${response.status}`);
@@ -585,15 +610,48 @@
     function createQuizCard(quiz) {
       const card = document.createElement('div');
       card.className = 'quiz-card';
-      card.onclick = () => startQuiz(quiz.id);
+      
+      const status = quiz.participationStatus;
+      let statusHtml = '';
+      let clickAction = null;
+
+      if (status.status === 'completed') {
+        statusHtml = `
+          <div class="quiz-status" style="background: rgba(16, 185, 129, 0.1); color: var(--success);">
+            ✓ Completado (${status.score}/${status.total_questions})
+          </div>
+          <span style="color: var(--text-muted);">Quiz ya realizado</span>
+        `;
+        card.style.opacity = '0.7';
+        card.style.cursor = 'not-allowed';
+      } else if (status.status === 'in_progress') {
+        statusHtml = `
+          <div class="quiz-status" style="background: rgba(251, 191, 36, 0.1); color: #f59e0b;">
+            ⏳ En progreso (${status.current_score} pts)
+          </div>
+          <span style="color: var(--primary-blue);">Click para continuar</span>
+        `;
+        clickAction = () => startQuiz(quiz.id);
+        card.style.cursor = 'pointer';
+      } else {
+        statusHtml = `
+          <div class="quiz-status status-active">Disponible</div>
+          <span>Click para iniciar</span>
+        `;
+        clickAction = () => startQuiz(quiz.id);
+        card.style.cursor = 'pointer';
+      }
+
+      if (clickAction) {
+        card.onclick = clickAction;
+      }
 
       card.innerHTML = `
         <div class="quiz-title">${quiz.title}</div>
         <div class="quiz-area">${quiz.area}</div>
         <div class="quiz-description">${quiz.description || 'Sin descripción disponible'}</div>
         <div class="quiz-meta">
-          <span class="quiz-status status-active">Activo</span>
-          <span>Click para iniciar</span>
+          ${statusHtml}
         </div>
       `;
 

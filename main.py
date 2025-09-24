@@ -93,8 +93,6 @@ class UserResponse(Base):
     answered_at = Column(DateTime, default=datetime.utcnow)
     
     participation = relationship("Participation", back_populates="responses")
-    question = relationship("Question")   # 🔹 agregar
-    answer = relationship("Answer")       # 🔹 agregar
 
 # Pydantic Models (NOMBRES CORREGIDOS AQUÍ)
 class UserCreate(BaseModel):
@@ -332,6 +330,37 @@ def add_question(quiz_id: int, question: QuestionCreate, db: Session = Depends(g
     return {"message": "Pregunta agregada exitosamente"}
 
 # Participation endpoints
+@app.get("/api/users/{uni}/quiz/{quiz_id}/status")
+def get_participation_status(uni: str, quiz_id: int, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.uni == uni).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    participation = db.query(Participation).filter(
+        Participation.user_id == user.id,
+        Participation.quiz_id == quiz_id
+    ).first()
+    
+    if not participation:
+        return {"status": "not_started", "can_participate": True}
+    
+    if participation.completed:
+        return {
+            "status": "completed",
+            "can_participate": False,
+            "score": participation.score,
+            "total_questions": participation.total_questions,
+            "percentage": round((participation.score / participation.total_questions) * 100, 2),
+            "completed_at": participation.completed_at
+        }
+    
+    return {
+        "status": "in_progress", 
+        "can_participate": True,
+        "participation_id": participation.id,
+        "current_score": participation.score
+    }
+
 @app.post("/api/participate/{quiz_id}")
 def start_participation(quiz_id: int, uni: str, db: Session = Depends(get_db)):
     # Get or create user
@@ -343,7 +372,20 @@ def start_participation(quiz_id: int, uni: str, db: Session = Depends(get_db)):
     if not quiz or not quiz.is_active:
         raise HTTPException(status_code=404, detail="Quiz no disponible")
     
-    # Check if already participating
+    # Check if already completed this quiz
+    completed_participation = db.query(Participation).filter(
+        Participation.user_id == user.id,
+        Participation.quiz_id == quiz_id,
+        Participation.completed == True
+    ).first()
+    
+    if completed_participation:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Ya completaste este quiz. Puntuación: {completed_participation.score}/{completed_participation.total_questions}"
+        )
+    
+    # Check if already participating (incomplete)
     existing = db.query(Participation).filter(
         Participation.user_id == user.id,
         Participation.quiz_id == quiz_id,
@@ -452,23 +494,6 @@ def generate_qr(quiz_id: int, db: Session = Depends(get_db)):
         "url": quiz_url
     }
 
-@app.get("/api/responses")
-def get_all_responses(db: Session = Depends(get_db)):
-    responses = db.query(UserResponse).all()
-    result = []
-    for r in responses:
-        result.append({
-            "participation_id": r.participation_id,
-            "user_uni": r.participation.user.uni,
-            "quiz_title": r.participation.quiz.title,
-            "question_text": r.question.question_text,
-            "answer_text": r.answer.answer_text,
-            "is_correct": r.is_correct,
-            "response_time": r.response_time,
-            "answered_at": r.answered_at
-        })
-    return result
-    
 # Health check
 @app.get("/")
 def health_check():
