@@ -894,961 +894,1072 @@
   </div>
 
   <script>
- // API Configuration
-const API_BASE_URL = 'https://quiz-system-sfrf.onrender.com';
-
-// Global variables
-let currentQuizId = null;
-let currentQuestionId = null;
-let answerCount = 0;
-let currentResponsesData = [];
-
-// DOM Elements
-const loginScreen = document.getElementById('loginScreen');
-const adminPanel = document.getElementById('adminPanel');
-const loginForm = document.getElementById('loginForm');
-const loginError = document.getElementById('loginError');
-
-// Navigation
-const navLinks = document.querySelectorAll('.nav-link');
-const pages = document.querySelectorAll('.page');
-
-// Initialize
-document.addEventListener('DOMContentLoaded', function() {
-  if (sessionStorage.getItem('adminLoggedIn') === 'true') {
-    showAdminPanel();
-  }
-  setupEventListeners();
-});
-
-function setupEventListeners() {
-  loginForm.addEventListener('submit', handleLogin);
-  document.getElementById('logoutBtn').addEventListener('click', handleLogout);
-  
-  navLinks.forEach(link => {
-    link.addEventListener('click', (e) => {
-      e.preventDefault();
-      navigateToPage(link.dataset.page);
-    });
-  });
-  
-  document.getElementById('addQuizBtn').addEventListener('click', () => openQuizModal());
-  document.getElementById('addUserBtn').addEventListener('click', () => openUserModal());
-  document.getElementById('addQuestionBtn').addEventListener('click', () => openQuestionModal());
-  document.getElementById('addAnswerBtn').addEventListener('click', addAnswerField);
-  document.getElementById('quizSelect').addEventListener('change', handleQuizSelectChange);
-  document.getElementById('exportBtn').addEventListener('click', exportResponses);
-  
-  document.getElementById('quizForm').addEventListener('submit', handleQuizSubmit);
-  document.getElementById('userForm').addEventListener('submit', handleUserSubmit);
-  document.getElementById('questionForm').addEventListener('submit', handleQuestionSubmit);
-}
-
-async function handleLogin(e) {
-  e.preventDefault();
-  const username = document.getElementById('username').value;
-  const password = document.getElementById('password').value;
-  
-  if (username === 'admin' && password === '1233') {
-    sessionStorage.setItem('adminLoggedIn', 'true');
-    showAdminPanel();
-  } else {
-    showLoginError('Credenciales incorrectas');
-  }
-}
-
-function showLoginError(message) {
-  loginError.textContent = message;
-  loginError.classList.remove('hidden');
-}
-
-function handleLogout() {
-  sessionStorage.removeItem('adminLoggedIn');
-  loginScreen.classList.remove('hidden');
-  adminPanel.classList.add('hidden');
-  document.getElementById('username').value = '';
-  document.getElementById('password').value = '';
-  loginError.classList.add('hidden');
-}
-
-function showAdminPanel() {
-  loginScreen.classList.add('hidden');
-  adminPanel.classList.remove('hidden');
-  navigateToPage('dashboard');
-}
-
-function navigateToPage(pageName) {
-  navLinks.forEach(link => {
-    link.classList.toggle('active', link.dataset.page === pageName);
-  });
-  
-  pages.forEach(page => {
-    page.classList.toggle('hidden', page.id !== `${pageName}Page`);
-  });
-  
-  switch(pageName) {
-    case 'dashboard': loadDashboard(); break;
-    case 'quizzes': loadQuizzes(); break;
-    case 'users': loadUsers(); break;
-  }
-}
-
-async function loadDashboard() {
-  try {
-    // Cargar estadísticas básicas
-    const response = await fetch(`${API_BASE_URL}/api/quizzes/`);
-    const quizzes = await response.json();
-    const activeQuizzes = quizzes.filter(q => q.is_active);
+    // API Configuration
+    const API_BASE_URL = 'https://quiz-system-sfrf.onrender.com';
     
-    // Cargar usuarios
-    const usersResponse = await fetch(`${API_BASE_URL}/api/users/`);
-    const users = await usersResponse.json();
+    // Global variables
+    let currentQuizId = null;
+    let currentQuestionId = null;
+    let answerCount = 0;
     
-    const statsHtml = `
-      <div class="stat-card">
-        <div class="stat-number">${quizzes.length}</div>
-        <div class="stat-label">Total Quizzes</div>
-      </div>
-      <div class="stat-card" style="background: linear-gradient(135deg, var(--success), #059669);">
-        <div class="stat-number">${activeQuizzes.length}</div>
-        <div class="stat-label">Quizzes Activos</div>
-      </div>
-      <div class="stat-card" style="background: linear-gradient(135deg, var(--warning), #d97706);">
-        <div class="stat-number">${quizzes.length - activeQuizzes.length}</div>
-        <div class="stat-label">Quizzes Inactivos</div>
-      </div>
-      <div class="stat-card" style="background: linear-gradient(135deg, var(--primary-red), #dc2626);">
-        <div class="stat-number">${users.length}</div>
-        <div class="stat-label">Total Usuarios</div>
-      </div>
-    `;
+    // DOM Elements
+    const loginScreen = document.getElementById('loginScreen');
+    const adminPanel = document.getElementById('adminPanel');
+    const loginForm = document.getElementById('loginForm');
+    const loginError = document.getElementById('loginError');
     
-    document.getElementById('statsGrid').innerHTML = statsHtml;
+    // Navigation
+    const navLinks = document.querySelectorAll('.nav-link');
+    const pages = document.querySelectorAll('.page');
     
-    // Populate quiz selector
-    const quizSelect = document.getElementById('quizSelect');
-    const quizOptions = quizzes.map(quiz => 
-      `<option value="${quiz.id}">${quiz.title} - ${quiz.area}</option>`
-    ).join('');
-    quizSelect.innerHTML = '<option value="">Selecciona un quiz</option>' + quizOptions;
-    
-    // Recent activity
-    const recentHtml = quizzes.slice(0, 5).map(quiz => `
-      <div style="padding: 12px 0; border-bottom: 1px solid var(--border);">
-        <strong>${quiz.title}</strong> - ${quiz.area}
-        <div style="font-size: 12px; color: var(--text-muted);">
-          ${new Date(quiz.created_at).toLocaleDateString()}
-        </div>
-      </div>
-    `).join('');
-    
-    document.getElementById('recentActivity').innerHTML = recentHtml || '<p>No hay actividad reciente</p>';
-    
-  } catch (error) {
-    console.error('Error loading dashboard:', error);
-    document.getElementById('statsGrid').innerHTML = '<div class="error">Error al cargar estadísticas</div>';
-  }
-}
-
-async function handleQuizSelectChange(e) {
-  const quizId = e.target.value;
-  const leaderboardDiv = document.getElementById('leaderboard');
-  const responsesCard = document.getElementById('responsesCard');
-  
-  if (!quizId) {
-    leaderboardDiv.innerHTML = '<div class="loading">Selecciona un quiz para ver el ranking</div>';
-    responsesCard.style.display = 'none';
-    return;
-  }
-  
-  leaderboardDiv.innerHTML = '<div class="loading">Cargando ranking...</div>';
-  responsesCard.style.display = 'block';
-  document.getElementById('responsesTable').innerHTML = '<div class="loading">Cargando respuestas...</div>';
-  
-  try {
-    await loadLeaderboard(quizId);
-    await loadResponsesTable(quizId);
-  } catch (error) {
-    console.error('Error loading data:', error);
-    leaderboardDiv.innerHTML = '<div class="error">Error al cargar el ranking</div>';
-    document.getElementById('responsesTable').innerHTML = '<div class="error">Error al cargar respuestas</div>';
-  }
-}
-
-async function loadLeaderboard(quizId) {
-  try {
-    // Usar endpoint existente de participaciones generales y filtrar
-    const response = await fetch(`${API_BASE_URL}/api/participations/?completed_only=true`);
-    
-    if (!response.ok) {
-      throw new Error('Error al obtener participaciones');
-    }
-    
-    const allParticipations = await response.json();
-    
-    // Obtener información del quiz seleccionado
-    const quizResponse = await fetch(`${API_BASE_URL}/api/quizzes/${quizId}`);
-    const selectedQuiz = await quizResponse.json();
-    
-    // Filtrar participaciones por el quiz seleccionado
-    const participations = allParticipations.filter(p => p.quiz_title === selectedQuiz.title);
-    
-    if (participations.length === 0) {
-      document.getElementById('leaderboard').innerHTML = `
-        <div class="empty-leaderboard">
-          <div class="icon">🏆</div>
-          <h4>No hay participaciones aún</h4>
-          <p>Este quiz aún no ha sido contestado por ningún usuario.</p>
-        </div>
-      `;
-      return;
-    }
-    
-    // Ordenar por porcentaje y luego por score
-    const rankings = participations.sort((a, b) => {
-      if (b.percentage !== a.percentage) {
-        return b.percentage - a.percentage;
+    // Initialize
+    document.addEventListener('DOMContentLoaded', function() {
+      // Check if already logged in
+      if (sessionStorage.getItem('adminLoggedIn') === 'true') {
+        showAdminPanel();
       }
-      return b.score - a.score;
+      
+      setupEventListeners();
     });
     
-    // Generar HTML del leaderboard
-    const leaderboardHtml = rankings.map((participant, index) => {
-      const rank = index + 1;
-      const rankClass = rank <= 3 ? `rank-${rank}` : '';
-      const totalScore = Math.round(participant.percentage * 10); // Score basado en porcentaje
+    function setupEventListeners() {
+      // Login form
+      loginForm.addEventListener('submit', handleLogin);
       
-      return `
-        <div class="leaderboard-item ${rankClass}">
-          <div class="rank-info">
-            <div class="rank-number">#${rank}</div>
-            <div class="participant-info">
-              <div class="participant-name">${participant.user_name}</div>
-              <div class="participant-uni">${participant.user_uni}</div>
-            </div>
-          </div>
-          <div class="score-info">
-            <div class="total-score">${totalScore}</div>
-            <div class="score-details">
-              ${participant.score}/${participant.total_questions} correctas
-              <br>
-              ${participant.percentage.toFixed(1)}% precisión
-            </div>
-          </div>
-        </div>
-      `;
-    }).join('');
-    
-    document.getElementById('leaderboard').innerHTML = leaderboardHtml;
-    
-  } catch (error) {
-    console.error('Error in loadLeaderboard:', error);
-    document.getElementById('leaderboard').innerHTML = `
-      <div class="error">
-        Error al cargar el ranking: ${error.message}
-      </div>
-    `;
-  }
-}
-
-async function loadResponsesTable(quizId) {
-  try {
-    // Obtener información del quiz
-    const quizResponse = await fetch(`${API_BASE_URL}/api/quizzes/${quizId}`);
-    const quiz = await quizResponse.json();
-    
-    // Obtener participaciones del quiz
-    const participationsResponse = await fetch(`${API_BASE_URL}/api/participations/?completed_only=true`);
-    const allParticipations = await participationsResponse.json();
-    
-    // Filtrar por el quiz seleccionado
-    const participations = allParticipations.filter(p => p.quiz_title === quiz.title);
-    
-    // Generar respuestas simuladas (ya que no tienes endpoint de respuestas detalladas)
-    const responses = [];
-    
-    for (const participation of participations) {
-      // Para cada pregunta del quiz, simular respuestas
-      quiz.questions.forEach((question, index) => {
-        // Simular si fue correcta basado en el score total
-        const correctProbability = participation.percentage / 100;
-        const isCorrect = Math.random() < correctProbability;
-        
-        // Seleccionar una respuesta
-        const correctAnswer = question.answers.find(a => a.is_correct);
-        const incorrectAnswers = question.answers.filter(a => !a.is_correct);
-        const selectedAnswer = isCorrect && correctAnswer ? correctAnswer : 
-                             (incorrectAnswers.length > 0 ? incorrectAnswers[Math.floor(Math.random() * incorrectAnswers.length)] : question.answers[0]);
-        
-        responses.push({
-          user_name: participation.user_name,
-          user_uni: participation.user_uni,
-          question_order: question.question_order,
-          question_text: question.question_text,
-          answer_text: selectedAnswer ? selectedAnswer.answer_text : 'N/A',
-          is_correct: isCorrect,
-          response_time: Math.floor(Math.random() * 25000) + 5000,
-          completed_at: participation.completed_at
+      // Logout
+      document.getElementById('logoutBtn').addEventListener('click', handleLogout);
+      
+      // Navigation
+      navLinks.forEach(link => {
+        link.addEventListener('click', (e) => {
+          e.preventDefault();
+          const page = link.dataset.page;
+          navigateToPage(page);
         });
       });
+      
+      // Modal buttons
+      document.getElementById('addQuizBtn').addEventListener('click', () => openQuizModal());
+      document.getElementById('addUserBtn').addEventListener('click', () => openUserModal());
+      document.getElementById('addQuestionBtn').addEventListener('click', () => openQuestionModal());
+      document.getElementById('addAnswerBtn').addEventListener('click', addAnswerField);
+      
+      // Quiz select change event
+      document.getElementById('quizSelect').addEventListener('change', handleQuizSelectChange);
+      
+      // Export button
+      document.getElementById('exportBtn').addEventListener('click', exportResponses);
+      
+      // Forms
+      document.getElementById('quizForm').addEventListener('submit', handleQuizSubmit);
+      document.getElementById('userForm').addEventListener('submit', handleUserSubmit);
+      document.getElementById('questionForm').addEventListener('submit', handleQuestionSubmit);
     }
     
-    // Guardar para exportación
-    currentResponsesData = responses;
+    async function handleLogin(e) {
+      e.preventDefault();
+      
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      
+      if (username === 'admin' && password === '1233') {
+        sessionStorage.setItem('adminLoggedIn', 'true');
+        showAdminPanel();
+      } else {
+        showLoginError('Credenciales incorrectas');
+      }
+    }
     
-    if (responses.length === 0) {
-      document.getElementById('responsesTable').innerHTML = `
+    function showLoginError(message) {
+      loginError.textContent = message;
+      loginError.classList.remove('hidden');
+    }
+    
+    function handleLogout() {
+      sessionStorage.removeItem('adminLoggedIn');
+      loginScreen.classList.remove('hidden');
+      adminPanel.classList.add('hidden');
+      document.getElementById('username').value = '';
+      document.getElementById('password').value = '';
+      loginError.classList.add('hidden');
+    }
+    
+    function showAdminPanel() {
+      loginScreen.classList.add('hidden');
+      adminPanel.classList.remove('hidden');
+      navigateToPage('dashboard');
+    }
+    
+    function navigateToPage(pageName) {
+      // Update navigation
+      navLinks.forEach(link => {
+        link.classList.toggle('active', link.dataset.page === pageName);
+      });
+      
+      // Show page
+      pages.forEach(page => {
+        page.classList.toggle('hidden', page.id !== `${pageName}Page`);
+      });
+      
+      // Load page data
+      switch(pageName) {
+        case 'dashboard':
+          loadDashboard();
+          break;
+        case 'quizzes':
+          loadQuizzes();
+          break;
+        case 'users':
+          loadUsers();
+          break;
+      }
+    }
+    
+    async function loadDashboard() {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/quizzes/`);
+        const quizzes = await response.json();
+        const activeQuizzes = quizzes.filter(q => q.is_active);
+        
+        const statsHtml = `
+          <div class="stat-card">
+            <div class="stat-number">${quizzes.length}</div>
+            <div class="stat-label">Total Quizzes</div>
+          </div>
+          <div class="stat-card" style="background: linear-gradient(135deg, var(--success), #059669);">
+            <div class="stat-number">${activeQuizzes.length}</div>
+            <div class="stat-label">Quizzes Activos</div>
+          </div>
+          <div class="stat-card" style="background: linear-gradient(135deg, var(--warning), #d97706);">
+            <div class="stat-number">${quizzes.length - activeQuizzes.length}</div>
+            <div class="stat-label">Quizzes Inactivos</div>
+          </div>
+        `;
+        
+        document.getElementById('statsGrid').innerHTML = statsHtml;
+        
+        // Populate quiz selector
+        const quizSelect = document.getElementById('quizSelect');
+        const quizOptions = quizzes.map(quiz => 
+          `<option value="${quiz.id}">${quiz.title} - ${quiz.area}</option>`
+        ).join('');
+        quizSelect.innerHTML = '<option value="">Selecciona un quiz</option>' + quizOptions;
+        
+        const recentHtml = quizzes.slice(0, 5).map(quiz => `
+          <div style="padding: 12px 0; border-bottom: 1px solid var(--border);">
+            <strong>${quiz.title}</strong> - ${quiz.area}
+            <div style="font-size: 12px; color: var(--text-muted);">
+              ${new Date(quiz.created_at).toLocaleDateString()}
+            </div>
+          </div>
+        `).join('');
+        
+        document.getElementById('recentActivity').innerHTML = recentHtml || '<p>No hay actividad reciente</p>';
+        
+      } catch (error) {
+        console.error('Error loading dashboard:', error);
+      }
+    }
+
+    async function handleQuizSelectChange(e) {
+      const quizId = e.target.value;
+      const leaderboardDiv = document.getElementById('leaderboard');
+      const responsesCard = document.getElementById('responsesCard');
+      
+      if (!quizId) {
+        leaderboardDiv.innerHTML = '<div class="loading">Selecciona un quiz para ver el ranking</div>';
+        responsesCard.style.display = 'none';
+        return;
+      }
+      
+      leaderboardDiv.innerHTML = '<div class="loading">Cargando ranking...</div>';
+      responsesCard.style.display = 'block';
+      document.getElementById('responsesTable').innerHTML = '<div class="loading">Cargando respuestas...</div>';
+      
+      try {
+        await loadLeaderboard(quizId);
+        await loadResponsesTable(quizId);
+      } catch (error) {
+        console.error('Error loading data:', error);
+        leaderboardDiv.innerHTML = '<div class="error">Error al cargar el ranking</div>';
+        document.getElementById('responsesTable').innerHTML = '<div class="error">Error al cargar respuestas</div>';
+      }
+    }
+
+    async function loadLeaderboard(quizId) {
+      try {
+        // Obtener participaciones del quiz
+        const response = await fetch(`${API_BASE_URL}/api/quizzes/${quizId}/participations`);
+        
+        if (!response.ok) {
+          throw new Error('Error al obtener participaciones');
+        }
+        
+        const participations = await response.json();
+        
+        if (participations.length === 0) {
+          document.getElementById('leaderboard').innerHTML = `
+            <div class="empty-leaderboard">
+              <div class="icon">🏆</div>
+              <h4>No hay participaciones aún</h4>
+              <p>Este quiz aún no ha sido contestado por ningún usuario.</p>
+            </div>
+          `;
+          return;
+        }
+        
+        // Calcular puntuaciones y ordenar
+        const rankings = await calculateRankings(participations);
+        
+        // Generar HTML del leaderboard
+        const leaderboardHtml = rankings.map((participant, index) => {
+          const rank = index + 1;
+          const rankClass = rank <= 3 ? `rank-${rank}` : '';
+          
+          return `
+            <div class="leaderboard-item ${rankClass}">
+              <div class="rank-info">
+                <div class="rank-number">#${rank}</div>
+                <div class="participant-info">
+                  <div class="participant-name">${participant.user_name}</div>
+                  <div class="participant-uni">${participant.user_uni}</div>
+                </div>
+              </div>
+              <div class="score-info">
+                <div class="total-score">${participant.totalScore.toFixed(0)}</div>
+                <div class="score-details">
+                  ${participant.correctAnswers}/${participant.totalQuestions} correctas
+                  <br>
+                  ${participant.avgTime.toFixed(1)}s promedio
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('');
+        
+        document.getElementById('leaderboard').innerHTML = leaderboardHtml;
+        
+      } catch (error) {
+        console.error('Error in loadLeaderboard:', error);
+        document.getElementById('leaderboard').innerHTML = `
+          <div class="error">
+            Error al cargar el ranking. Es posible que este quiz no tenga participaciones registradas.
+          </div>
+        `;
+      }
+    }
+
+    async function calculateRankings(participations) {
+      const rankings = [];
+      
+      for (const participation of participations) {
+        try {
+          // Obtener detalles de las respuestas
+          const responsesResponse = await fetch(`${API_BASE_URL}/api/participations/${participation.id}/responses`);
+          
+          if (!responsesResponse.ok) {
+            console.warn(`No se pudieron obtener respuestas para participación ${participation.id}`);
+            continue;
+          }
+          
+          const responses = await responsesResponse.json();
+          
+          if (responses.length === 0) {
+            continue;
+          }
+          
+          // Calcular métricas
+          const correctAnswers = responses.filter(r => r.is_correct).length;
+          const totalQuestions = responses.length;
+          const accuracy = correctAnswers / totalQuestions;
+          
+          // Calcular tiempo promedio (en segundos)
+          const totalTime = responses.reduce((sum, r) => sum + (r.response_time || 30000), 0);
+          const avgTime = totalTime / (responses.length * 1000); // Convertir a segundos
+          
+          // Calcular puntuación total
+          // Fórmula: (Precisión * 1000) + Bonus por velocidad - Penalización por tiempo
+          let totalScore = accuracy * 1000;
+          
+          // Bonus por velocidad: menos tiempo = más puntos
+          const speedBonus = Math.max(0, (30 - avgTime) * 10); // Máximo 300 puntos de bonus
+          totalScore += speedBonus;
+          
+          // Bonus por respuestas perfectas
+          if (accuracy === 1.0) {
+            totalScore += 200; // Bonus por perfección
+          }
+          
+          rankings.push({
+            user_name: participation.user_name,
+            user_uni: participation.user_uni,
+            correctAnswers,
+            totalQuestions,
+            accuracy,
+            avgTime,
+            totalScore,
+            completedAt: participation.completed_at
+          });
+          
+        } catch (error) {
+          console.error(`Error procesando participación ${participation.id}:`, error);
+        }
+      }
+      
+      // Ordenar por puntuación total (descendente)
+      return rankings.sort((a, b) => b.totalScore - a.totalScore);
+    }
+
+    // Global variable to store current responses data for export
+    let currentResponsesData = [];
+
+    async function loadResponsesTable(quizId) {
+      try {
+        // Obtener participaciones del quiz
+        const response = await fetch(`${API_BASE_URL}/api/quizzes/${quizId}/participations`);
+        
+        if (!response.ok) {
+          throw new Error('Error al obtener participaciones');
+        }
+        
+        const participations = await response.json();
+        
+        // Obtener información del quiz para los headers
+        const quizResponse = await fetch(`${API_BASE_URL}/api/quizzes/${quizId}`);
+        const quiz = await quizResponse.json();
+        
+        // Crear estructura de la tabla
+        const tableHtml = await generateResponsesTable(participations, quiz);
+        document.getElementById('responsesTable').innerHTML = tableHtml;
+        
+      } catch (error) {
+        console.error('Error loading responses table:', error);
+        document.getElementById('responsesTable').innerHTML = `
+          <div class="error">
+            Error al cargar la tabla de respuestas. Verifica que el quiz tenga participaciones.
+          </div>
+        `;
+      }
+    }
+
+    async function generateResponsesTable(participations, quiz) {
+      const responses = [];
+      
+      // Obtener todas las respuestas de todas las participaciones
+      for (const participation of participations) {
+        try {
+          const responsesResponse = await fetch(`${API_BASE_URL}/api/participations/${participation.id}/responses`);
+          
+          if (responsesResponse.ok) {
+            const participationResponses = await responsesResponse.json();
+            
+            // Agregar información del usuario a cada respuesta
+            participationResponses.forEach(response => {
+              responses.push({
+                ...response,
+                user_name: participation.user_name,
+                user_uni: participation.user_uni,
+                completed_at: participation.completed_at
+              });
+            });
+          }
+        } catch (error) {
+          console.warn(`Error obteniendo respuestas para participación ${participation.id}:`, error);
+        }
+      }
+      
+      // Guardar datos para exportación
+      currentResponsesData = responses;
+      
+      // Si no hay respuestas, mostrar tabla vacía
+      if (responses.length === 0) {
+        return `
+          <div class="responses-table">
+            <table class="table table-striped table-compact">
+              <thead>
+                <tr>
+                  <th>Usuario</th>
+                  <th>UNI</th>
+                  <th>Pregunta #</th>
+                  <th>Pregunta</th>
+                  <th>Respuesta Seleccionada</th>
+                  <th>Correcta</th>
+                  <th>Tiempo (ms)</th>
+                  <th>Fecha</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td colspan="8" class="empty-table">
+                    No hay respuestas registradas para este quiz
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        `;
+      }
+      
+      // Ordenar respuestas por usuario y orden de pregunta
+      responses.sort((a, b) => {
+        if (a.user_uni !== b.user_uni) {
+          return a.user_uni.localeCompare(b.user_uni);
+        }
+        return a.question_order - b.question_order;
+      });
+      
+      // Generar HTML de la tabla
+      const tableRows = responses.map(response => {
+        const isCorrect = response.is_correct;
+        const correctClass = isCorrect ? 'correct-answer' : 'incorrect-answer';
+        const correctIcon = isCorrect ? '✓' : '✗';
+        const timeDisplay = response.response_time ? `${response.response_time}ms` : 'N/A';
+        const dateDisplay = new Date(response.completed_at).toLocaleString();
+        
+        return `
+          <tr>
+            <td>${response.user_name}</td>
+            <td><strong>${response.user_uni}</strong></td>
+            <td>${response.question_order}</td>
+            <td style="max-width: 300px; word-wrap: break-word;">${response.question_text}</td>
+            <td style="max-width: 200px; word-wrap: break-word;">${response.answer_text}</td>
+            <td class="${correctClass}">${correctIcon} ${isCorrect ? 'Sí' : 'No'}</td>
+            <td class="response-time">${timeDisplay}</td>
+            <td>${dateDisplay}</td>
+          </tr>
+        `;
+      }).join('');
+      
+      return `
         <div class="responses-table">
           <table class="table table-striped table-compact">
             <thead>
               <tr>
-                <th>Usuario</th><th>UNI</th><th>Pregunta #</th><th>Pregunta</th>
-                <th>Respuesta Seleccionada</th><th>Correcta</th><th>Tiempo (ms)</th><th>Fecha</th>
+                <th>Usuario</th>
+                <th>UNI</th>
+                <th>Pregunta #</th>
+                <th>Pregunta</th>
+                <th>Respuesta Seleccionada</th>
+                <th>Correcta</th>
+                <th>Tiempo (ms)</th>
+                <th>Fecha</th>
               </tr>
             </thead>
             <tbody>
-              <tr><td colspan="8" class="empty-table">No hay respuestas registradas</td></tr>
+              ${tableRows}
             </tbody>
           </table>
         </div>
       `;
-      return;
-    }
-    
-    // Ordenar respuestas
-    responses.sort((a, b) => {
-      if (a.user_uni !== b.user_uni) return a.user_uni.localeCompare(b.user_uni);
-      return a.question_order - b.question_order;
-    });
-    
-    // Generar tabla
-    const tableRows = responses.map(response => {
-      const correctClass = response.is_correct ? 'correct-answer' : 'incorrect-answer';
-      const correctIcon = response.is_correct ? '✓' : '✗';
-      const timeDisplay = `${response.response_time}ms`;
-      const dateDisplay = new Date(response.completed_at).toLocaleString();
-      
-      return `
-        <tr>
-          <td>${response.user_name}</td>
-          <td><strong>${response.user_uni}</strong></td>
-          <td>${response.question_order}</td>
-          <td style="max-width: 300px; word-wrap: break-word;">${response.question_text}</td>
-          <td style="max-width: 200px; word-wrap: break-word;">${response.answer_text}</td>
-          <td class="${correctClass}">${correctIcon} ${response.is_correct ? 'Sí' : 'No'}</td>
-          <td class="response-time">${timeDisplay}</td>
-          <td>${dateDisplay}</td>
-        </tr>
-      `;
-    }).join('');
-    
-    document.getElementById('responsesTable').innerHTML = `
-      <div class="responses-table">
-        <table class="table table-striped table-compact">
-          <thead>
-            <tr>
-              <th>Usuario</th><th>UNI</th><th>Pregunta #</th><th>Pregunta</th>
-              <th>Respuesta Seleccionada</th><th>Correcta</th><th>Tiempo (ms)</th><th>Fecha</th>
-            </tr>
-          </thead>
-          <tbody>${tableRows}</tbody>
-        </table>
-      </div>
-    `;
-    
-  } catch (error) {
-    console.error('Error loading responses table:', error);
-    document.getElementById('responsesTable').innerHTML = `
-      <div class="error">Error al cargar respuestas: ${error.message}</div>
-    `;
-  }
-}
-
-function exportResponses() {
-  if (currentResponsesData.length === 0) {
-    alert('No hay datos para exportar');
-    return;
-  }
-  
-  const quizSelect = document.getElementById('quizSelect');
-  const selectedQuizText = quizSelect.options[quizSelect.selectedIndex].text;
-  
-  const csvData = currentResponsesData.map(response => ({
-    'Usuario': response.user_name,
-    'UNI': response.user_uni,
-    'Pregunta #': response.question_order,
-    'Pregunta': response.question_text,
-    'Respuesta Seleccionada': response.answer_text,
-    'Es Correcta': response.is_correct ? 'Sí' : 'No',
-    'Tiempo Respuesta (ms)': response.response_time,
-    'Fecha Completado': new Date(response.completed_at).toLocaleString()
-  }));
-  
-  const csv = convertToCSV(csvData);
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const link = document.createElement('a');
-  const url = URL.createObjectURL(blob);
-  link.setAttribute('href', url);
-  link.setAttribute('download', `respuestas_${selectedQuizText.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.csv`);
-  link.style.visibility = 'hidden';
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  
-  showSuccess('Archivo CSV descargado exitosamente');
-}
-
-function convertToCSV(data) {
-  if (data.length === 0) return '';
-  
-  const headers = Object.keys(data[0]);
-  const csvRows = [
-    headers.join(','),
-    ...data.map(row => 
-      headers.map(header => {
-        const value = row[header];
-        const stringValue = String(value).replace(/"/g, '""');
-        return stringValue.includes(',') || stringValue.includes('\n') || stringValue.includes('"') 
-          ? `"${stringValue}"` 
-          : stringValue;
-      }).join(',')
-    )
-  ];
-  
-  return csvRows.join('\n');
-}
-
-async function loadQuizzes() {
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/quizzes/`);
-    const quizzes = await response.json();
-    
-    const html = `
-      <table class="table">
-        <thead>
-          <tr><th>Título</th><th>Área</th><th>Estado</th><th>Creado</th><th>Acciones</th></tr>
-        </thead>
-        <tbody>
-          ${quizzes.map(quiz => `
-            <tr>
-              <td><strong>${quiz.title}</strong></td>
-              <td>${quiz.area}</td>
-              <td>
-                <span class="status-badge ${quiz.is_active ? 'status-active' : 'status-inactive'}">
-                  ${quiz.is_active ? 'Activo' : 'Inactivo'}
-                </span>
-              </td>
-              <td>${new Date(quiz.created_at).toLocaleDateString()}</td>
-              <td>
-                <button class="btn btn-small btn-primary" onclick="editQuiz(${quiz.id})">Editar</button>
-                <button class="btn btn-small btn-warning" onclick="toggleQuizStatus(${quiz.id}, ${!quiz.is_active})">
-                  ${quiz.is_active ? 'Desactivar' : 'Activar'}
-                </button>
-                <button class="btn btn-small btn-success" onclick="manageQuestions(${quiz.id}, '${quiz.title}')">Preguntas</button>
-                <button class="btn btn-small btn-danger" onclick="deleteQuiz(${quiz.id})">Eliminar</button>
-              </td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-    `;
-    
-    document.getElementById('quizzesList').innerHTML = html;
-    
-  } catch (error) {
-    console.error('Error loading quizzes:', error);
-    document.getElementById('quizzesList').innerHTML = '<div class="error">Error al cargar quizzes</div>';
-  }
-}
-
-async function loadUsers() {
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/users/`);
-    const users = await response.json();
-
-    if (users.length === 0) {
-      document.getElementById('usersList').innerHTML = '<p>No hay usuarios registrados</p>';
-      return;
     }
 
-    const html = `
-      <table class="table">
-        <thead>
-          <tr><th>UNI</th><th>Nombre</th><th>Fecha Registro</th><th>Acciones</th></tr>
-        </thead>
-        <tbody>
-          ${users.map(user => `
-            <tr>
-              <td>${user.uni}</td>
-              <td>${user.name}</td>
-              <td>${new Date(user.created_at).toLocaleDateString()}</td>
-              <td>
-                <button class="btn btn-small btn-primary" onclick="editUser(${user.id})">Editar</button>
-                <button class="btn btn-small btn-danger" onclick="deleteUser(${user.id})">Eliminar</button>
-              </td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-    `;
-
-    document.getElementById('usersList').innerHTML = html;
-
-  } catch (error) {
-    console.error('Error loading users:', error);
-    document.getElementById('usersList').innerHTML = '<div class="error">Error al cargar usuarios</div>';
-  }
-}
-
-async function editUser(userId) {
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/users/`);
-    const users = await response.json();
-    const user = users.find(u => u.id === userId);
-    
-    if (user) {
-      openUserModal(user);
-    } else {
-      throw new Error('Usuario no encontrado');
-    }
-  } catch (error) {
-    console.error('Error loading user:', error);
-    alert('Error al cargar usuario');
-  }
-}
-
-async function deleteUser(userId) {
-  if (!confirm('¿Estás seguro de eliminar este usuario?')) return;
-  
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/users/${userId}`, { method: 'DELETE' });
-    if (res.ok) {
-      showSuccess('Usuario eliminado exitosamente');
-      loadUsers();
-    } else {
-      throw new Error('Error al eliminar usuario');
-    }
-  } catch (error) {
-    console.error(error);
-    alert('No se pudo eliminar el usuario');
-  }
-}
-
-// Quiz Management Functions
-function openQuizModal(quiz = null) {
-  const modal = document.getElementById('quizModal');
-  const title = document.getElementById('quizModalTitle');
-  const form = document.getElementById('quizForm');
-  
-  if (quiz) {
-    title.textContent = 'Editar Quiz';
-    document.getElementById('quizId').value = quiz.id;
-    document.getElementById('quizTitle').value = quiz.title;
-    document.getElementById('quizArea').value = quiz.area;
-    document.getElementById('quizDescription').value = quiz.description || '';
-    document.getElementById('quizActive').checked = quiz.is_active;
-  } else {
-    title.textContent = 'Agregar Quiz';
-    form.reset();
-    document.getElementById('quizId').value = '';
-    document.getElementById('quizActive').checked = false;
-  }
-  
-  modal.classList.add('show');
-}
-
-async function editQuiz(quizId) {
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/quizzes/${quizId}`);
-    const quiz = await response.json();
-    openQuizModal(quiz);
-  } catch (error) {
-    console.error('Error loading quiz:', error);
-    alert('Error al cargar el quiz');
-  }
-}
-
-async function handleQuizSubmit(e) {
-  e.preventDefault();
-  
-  const quizId = document.getElementById('quizId').value;
-  const quizData = {
-    title: document.getElementById('quizTitle').value,
-    area: document.getElementById('quizArea').value,
-    description: document.getElementById('quizDescription').value,
-    is_active: document.getElementById('quizActive').checked
-  };
-  
-  try {
-    let response;
-    if (quizId) {
-      response = await fetch(`${API_BASE_URL}/api/quizzes/${quizId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(quizData)
-      });
-    } else {
-      response = await fetch(`${API_BASE_URL}/api/quizzes/`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(quizData)
-      });
-    }
-    
-    if (response.ok) {
-      closeModal('quizModal');
-      loadQuizzes();
-      showSuccess(quizId ? 'Quiz actualizado exitosamente' : 'Quiz creado exitosamente');
-    } else {
-      throw new Error('Error en la respuesta del servidor');
-    }
-    
-  } catch (error) {
-    console.error('Error saving quiz:', error);
-    alert('Error al guardar el quiz');
-  }
-}
-
-async function toggleQuizStatus(quizId, newStatus) {
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/quizzes/${quizId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ is_active: newStatus })
-    });
-    
-    if (response.ok) {
-      loadQuizzes();
-      showSuccess(`Quiz ${newStatus ? 'activado' : 'desactivado'} exitosamente`);
-    } else {
-      throw new Error('Error en la respuesta del servidor');
-    }
-    
-  } catch (error) {
-    console.error('Error toggling quiz status:', error);
-    alert('Error al cambiar el estado del quiz');
-  }
-}
-
-async function deleteQuiz(quizId) {
-  if (confirm('¿Estás seguro de que deseas eliminar este quiz?')) {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/quizzes/${quizId}`, {
-        method: 'DELETE'
-      });
-      
-      if (response.ok) {
-        loadQuizzes();
-        showSuccess('Quiz eliminado exitosamente');
-      } else {
-        throw new Error('Error en la respuesta del servidor');
+    function exportResponses() {
+      if (currentResponsesData.length === 0) {
+        alert('No hay datos para exportar. Selecciona un quiz con participaciones.');
+        return;
       }
       
-    } catch (error) {
-      console.error('Error deleting quiz:', error);
-      alert('Error al eliminar el quiz');
+      // Obtener el nombre del quiz seleccionado
+      const quizSelect = document.getElementById('quizSelect');
+      const selectedQuizText = quizSelect.options[quizSelect.selectedIndex].text;
+      
+      // Preparar datos para CSV
+      const csvData = currentResponsesData.map(response => ({
+        'Usuario': response.user_name,
+        'UNI': response.user_uni,
+        'Pregunta #': response.question_order,
+        'Pregunta': response.question_text,
+        'Respuesta Seleccionada': response.answer_text,
+        'Es Correcta': response.is_correct ? 'Sí' : 'No',
+        'Tiempo Respuesta (ms)': response.response_time || 'N/A',
+        'Fecha Completado': new Date(response.completed_at).toLocaleString()
+      }));
+      
+      // Convertir a CSV
+      const csv = convertToCSV(csvData);
+      
+      // Crear archivo y descargar
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `respuestas_${selectedQuizText.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      showSuccess('Archivo CSV descargado exitosamente');
     }
-  }
-}
 
-// User Management Functions
-function openUserModal(user = null) {
-  const modal = document.getElementById('userModal');
-  const title = document.getElementById('userModalTitle');
-  const form = document.getElementById('userForm');
-  
-  if (user) {
-    title.textContent = 'Editar Usuario';
-    document.getElementById('userId').value = user.id;
-    document.getElementById('userUni').value = user.uni;
-    document.getElementById('userName').value = user.name;
-  } else {
-    title.textContent = 'Agregar Usuario';
-    form.reset();
-    document.getElementById('userId').value = '';
-  }
-  
-  modal.classList.add('show');
-}
-
-async function handleUserSubmit(e) {
-  e.preventDefault();
-  
-  const userId = document.getElementById('userId').value;
-  const userData = {
-    uni: document.getElementById('userUni').value,
-    name: document.getElementById('userName').value
-  };
-  
-  try {
-    let response;
-    if (userId) {
-      response = await fetch(`${API_BASE_URL}/api/users/${userId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(userData)
-      });
-    } else {
-      response = await fetch(`${API_BASE_URL}/api/users/`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(userData)
-      });
-    }
-    
-    if (response.ok) {
-      closeModal('userModal');
-      loadUsers();
-      showSuccess(userId ? 'Usuario actualizado exitosamente' : 'Usuario creado exitosamente');
-    } else {
-      throw new Error('Error en la respuesta del servidor');
+    function convertToCSV(data) {
+      if (data.length === 0) return '';
+      
+      // Obtener headers
+      const headers = Object.keys(data[0]);
+      
+      // Crear filas CSV
+      const csvRows = [
+        headers.join(','), // Header row
+        ...data.map(row => 
+          headers.map(header => {
+            const value = row[header];
+            // Escapar comillas y envolver en comillas si contiene comas o saltos de línea
+            const stringValue = String(value).replace(/"/g, '""');
+            return stringValue.includes(',') || stringValue.includes('\n') || stringValue.includes('"') 
+              ? `"${stringValue}"` 
+              : stringValue;
+          }).join(',')
+        )
+      ];
+      
+      return csvRows.join('\n');
     }
     
-  } catch (error) {
-    console.error('Error saving user:', error);
-    alert('Error al guardar el usuario');
-  }
-}
-
-// Question Management Functions
-async function manageQuestions(quizId, quizTitle) {
-  currentQuizId = quizId;
-  const modal = document.getElementById('questionsModal');
-  const title = document.getElementById('questionsModalTitle');
-  
-  title.textContent = `Preguntas: ${quizTitle}`;
-  modal.classList.add('show');
-  
-  await loadQuestions();
-}
-
-async function loadQuestions() {
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/quizzes/${currentQuizId}`);
-    const quiz = await response.json();
+    async function loadQuizzes() {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/quizzes/`);
+        const quizzes = await response.json();
+        
+        const html = `
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Título</th>
+                <th>Área</th>
+                <th>Estado</th>
+                <th>Creado</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${quizzes.map(quiz => `
+                <tr>
+                  <td><strong>${quiz.title}</strong></td>
+                  <td>${quiz.area}</td>
+                  <td>
+                    <span class="status-badge ${quiz.is_active ? 'status-active' : 'status-inactive'}">
+                      ${quiz.is_active ? 'Activo' : 'Inactivo'}
+                    </span>
+                  </td>
+                  <td>${new Date(quiz.created_at).toLocaleDateString()}</td>
+                  <td>
+                    <button class="btn btn-small btn-primary" onclick="editQuiz(${quiz.id})">Editar</button>
+                    <button class="btn btn-small btn-warning" onclick="toggleQuizStatus(${quiz.id}, ${!quiz.is_active})">
+                      ${quiz.is_active ? 'Desactivar' : 'Activar'}
+                    </button>
+                    <button class="btn btn-small btn-success" onclick="manageQuestions(${quiz.id}, '${quiz.title}')">Preguntas</button>
+                    <button class="btn btn-small btn-danger" onclick="deleteQuiz(${quiz.id})">Eliminar</button>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `;
+        
+        document.getElementById('quizzesList').innerHTML = html;
+        
+      } catch (error) {
+        console.error('Error loading quizzes:', error);
+        document.getElementById('quizzesList').innerHTML = '<div class="error">Error al cargar quizzes</div>';
+      }
+    }
     
-    const questionsHtml = quiz.questions.map(question => `
-      <div class="question-item">
-        <div class="question-header">
-          <div class="question-text">${question.question_order}. ${question.question_text}</div>
-          <div class="question-actions">
-            <button class="btn btn-small btn-primary" onclick="editQuestion(${question.id})">Editar</button>
-            <button class="btn btn-small btn-danger" onclick="deleteQuestion(${question.id})">Eliminar</button>
-          </div>
-        </div>
-        <div class="answer-list">
-          ${question.answers.map(answer => `
-            <div class="answer-item ${answer.is_correct ? 'answer-correct' : ''}">
-              ${answer.answer_order}. ${answer.answer_text} ${answer.is_correct ? '✓' : ''}
+    async function loadUsers() {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/users/`);
+        const users = await response.json();
+
+        if (users.length === 0) {
+          document.getElementById('usersList').innerHTML = '<p>No hay usuarios registrados</p>';
+          return;
+        }
+
+        const html = `
+          <table class="table">
+            <thead>
+              <tr>
+                <th>UNI</th>
+                <th>Nombre</th>
+                <th>Fecha Registro</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${users.map(user => `
+                <tr>
+                  <td>${user.uni}</td>
+                  <td>${user.name}</td>
+                  <td>${new Date(user.created_at).toLocaleDateString()}</td>
+                  <td>
+                    <button class="btn btn-small btn-primary" onclick="editUser(${user.id})">Editar</button>
+                    <button class="btn btn-small btn-danger" onclick="deleteUser(${user.id})">Eliminar</button>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `;
+
+        document.getElementById('usersList').innerHTML = html;
+
+      } catch (error) {
+        console.error('Error loading users:', error);
+        document.getElementById('usersList').innerHTML = '<div class="error">Error al cargar usuarios</div>';
+      }
+    }
+
+    async function editUser(userId) {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/users/`);
+        const users = await response.json();
+        const user = users.find(u => u.id === userId);
+        
+        if (user) {
+          openUserModal(user);
+        } else {
+          throw new Error('Usuario no encontrado');
+        }
+      } catch (error) {
+        console.error('Error loading user:', error);
+        alert('Error al cargar usuario');
+      }
+    }
+
+    async function deleteUser(userId) {
+      if (!confirm('¿Estás seguro de eliminar este usuario?')) return;
+      
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/users/${userId}`, { method: 'DELETE' });
+        if (res.ok) {
+          showSuccess('Usuario eliminado exitosamente');
+          loadUsers();
+        } else {
+          throw new Error('Error al eliminar usuario');
+        }
+      } catch (error) {
+        console.error(error);
+        alert('No se pudo eliminar el usuario');
+      }
+    }
+    
+    // Quiz Management Functions
+    function openQuizModal(quiz = null) {
+      const modal = document.getElementById('quizModal');
+      const title = document.getElementById('quizModalTitle');
+      const form = document.getElementById('quizForm');
+      
+      if (quiz) {
+        title.textContent = 'Editar Quiz';
+        document.getElementById('quizId').value = quiz.id;
+        document.getElementById('quizTitle').value = quiz.title;
+        document.getElementById('quizArea').value = quiz.area;
+        document.getElementById('quizDescription').value = quiz.description || '';
+        document.getElementById('quizActive').checked = quiz.is_active;
+      } else {
+        title.textContent = 'Agregar Quiz';
+        form.reset();
+        document.getElementById('quizId').value = '';
+        document.getElementById('quizActive').checked = false;
+      }
+      
+      modal.classList.add('show');
+    }
+    
+    async function editQuiz(quizId) {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/quizzes/${quizId}`);
+        const quiz = await response.json();
+        openQuizModal(quiz);
+      } catch (error) {
+        console.error('Error loading quiz:', error);
+        alert('Error al cargar el quiz');
+      }
+    }
+    
+    async function handleQuizSubmit(e) {
+      e.preventDefault();
+      
+      const quizId = document.getElementById('quizId').value;
+      const quizData = {
+        title: document.getElementById('quizTitle').value,
+        area: document.getElementById('quizArea').value,
+        description: document.getElementById('quizDescription').value,
+        is_active: document.getElementById('quizActive').checked
+      };
+      
+      try {
+        let response;
+        if (quizId) {
+          response = await fetch(`${API_BASE_URL}/api/quizzes/${quizId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(quizData)
+          });
+        } else {
+          response = await fetch(`${API_BASE_URL}/api/quizzes/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(quizData)
+          });
+        }
+        
+        if (response.ok) {
+          closeModal('quizModal');
+          loadQuizzes();
+          showSuccess(quizId ? 'Quiz actualizado exitosamente' : 'Quiz creado exitosamente');
+        } else {
+          throw new Error('Error en la respuesta del servidor');
+        }
+        
+      } catch (error) {
+        console.error('Error saving quiz:', error);
+        alert('Error al guardar el quiz');
+      }
+    }
+
+    async function toggleQuizStatus(quizId, newStatus) {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/quizzes/${quizId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ is_active: newStatus })
+        });
+        
+        if (response.ok) {
+          loadQuizzes();
+          showSuccess(`Quiz ${newStatus ? 'activado' : 'desactivado'} exitosamente`);
+        } else {
+          throw new Error('Error en la respuesta del servidor');
+        }
+        
+      } catch (error) {
+        console.error('Error toggling quiz status:', error);
+        alert('Error al cambiar el estado del quiz');
+      }
+    }
+    
+    async function deleteQuiz(quizId) {
+      if (confirm('¿Estás seguro de que deseas eliminar este quiz? Esta acción no se puede deshacer.')) {
+        try {
+          const response = await fetch(`${API_BASE_URL}/api/quizzes/${quizId}`, {
+            method: 'DELETE'
+          });
+          
+          if (response.ok) {
+            loadQuizzes();
+            showSuccess('Quiz eliminado exitosamente');
+          } else {
+            throw new Error('Error en la respuesta del servidor');
+          }
+          
+        } catch (error) {
+          console.error('Error deleting quiz:', error);
+          alert('Error al eliminar el quiz');
+        }
+      }
+    }
+    
+    // User Management Functions
+    function openUserModal(user = null) {
+      const modal = document.getElementById('userModal');
+      const title = document.getElementById('userModalTitle');
+      const form = document.getElementById('userForm');
+      
+      if (user) {
+        title.textContent = 'Editar Usuario';
+        document.getElementById('userId').value = user.id;
+        document.getElementById('userUni').value = user.uni;
+        document.getElementById('userName').value = user.name;
+      } else {
+        title.textContent = 'Agregar Usuario';
+        form.reset();
+        document.getElementById('userId').value = '';
+      }
+      
+      modal.classList.add('show');
+    }
+    
+    async function handleUserSubmit(e) {
+      e.preventDefault();
+      
+      const userId = document.getElementById('userId').value;
+      const userData = {
+        uni: document.getElementById('userUni').value,
+        name: document.getElementById('userName').value
+      };
+      
+      try {
+        let response;
+        if (userId) {
+          // Update user
+          response = await fetch(`${API_BASE_URL}/api/users/${userId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(userData)
+          });
+        } else {
+          // Create user
+          response = await fetch(`${API_BASE_URL}/api/users/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(userData)
+          });
+        }
+        
+        if (response.ok) {
+          closeModal('userModal');
+          loadUsers();
+          showSuccess(userId ? 'Usuario actualizado exitosamente' : 'Usuario creado exitosamente');
+        } else {
+          throw new Error('Error en la respuesta del servidor');
+        }
+        
+      } catch (error) {
+        console.error('Error saving user:', error);
+        alert('Error al guardar el usuario');
+      }
+    }
+    
+    // Question Management Functions
+    async function manageQuestions(quizId, quizTitle) {
+      currentQuizId = quizId;
+      const modal = document.getElementById('questionsModal');
+      const title = document.getElementById('questionsModalTitle');
+      
+      title.textContent = `Preguntas: ${quizTitle}`;
+      modal.classList.add('show');
+      
+      await loadQuestions();
+    }
+    
+    async function loadQuestions() {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/quizzes/${currentQuizId}`);
+        const quiz = await response.json();
+        
+        const questionsHtml = quiz.questions.map(question => `
+          <div class="question-item">
+            <div class="question-header">
+              <div class="question-text">${question.question_order}. ${question.question_text}</div>
+              <div class="question-actions">
+                <button class="btn btn-small btn-primary" onclick="editQuestion(${question.id})">Editar</button>
+                <button class="btn btn-small btn-danger" onclick="deleteQuestion(${question.id})">Eliminar</button>
+              </div>
             </div>
-          `).join('')}
-        </div>
-        <div style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">
-          Tiempo límite: ${question.time_limit}s
-        </div>
-      </div>
-    `).join('');
-    
-    document.getElementById('questionsList').innerHTML = questionsHtml || '<p>No hay preguntas en este quiz</p>';
-    
-  } catch (error) {
-    console.error('Error loading questions:', error);
-    document.getElementById('questionsList').innerHTML = '<div class="error">Error al cargar preguntas</div>';
-  }
-}
-
-async function editQuestion(questionId) {
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/questions/${questionId}`);
-    const question = await response.json();
-    openQuestionModal(question);
-  } catch (error) {
-    console.error('Error loading question:', error);
-    alert('Error al cargar pregunta');
-  }
-}
-
-async function deleteQuestion(questionId) {
-  if (!confirm('¿Eliminar esta pregunta?')) return;
-  
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/questions/${questionId}`, { method: 'DELETE' });
-    if (res.ok) {
-      showSuccess('Pregunta eliminada');
-      loadQuestions();
-    } else {
-      throw new Error('Error al eliminar pregunta');
+            <div class="answer-list">
+              ${question.answers.map(answer => `
+                <div class="answer-item ${answer.is_correct ? 'answer-correct' : ''}">
+                  ${answer.answer_order}. ${answer.answer_text} ${answer.is_correct ? '✓' : ''}
+                </div>
+              `).join('')}
+            </div>
+            <div style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">
+              Tiempo límite: ${question.time_limit}s
+            </div>
+          </div>
+        `).join('');
+        
+        document.getElementById('questionsList').innerHTML = questionsHtml || '<p>No hay preguntas en este quiz</p>';
+        
+      } catch (error) {
+        console.error('Error loading questions:', error);
+        document.getElementById('questionsList').innerHTML = '<div class="error">Error al cargar preguntas</div>';
+      }
     }
-  } catch (error) {
-    console.error(error);
-    alert('No se pudo eliminar la pregunta');
-  }
-}
 
-function openQuestionModal(question = null) {
-  const modal = document.getElementById('questionModal');
-  const title = document.getElementById('questionModalTitle');
-  const form = document.getElementById('questionForm');
-  
-  document.getElementById('questionQuizId').value = currentQuizId;
-  
-  // Reset answer count
-  answerCount = 0;
-  
-  if (question) {
-    title.textContent = 'Editar Pregunta';
-    document.getElementById('questionId').value = question.id;
-    document.getElementById('questionText').value = question.question_text;
-    document.getElementById('questionOrder').value = question.question_order;
-    document.getElementById('questionTimeLimit').value = question.time_limit;
+    async function editQuestion(questionId) {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/questions/${questionId}`);
+        const question = await response.json();
+        openQuestionModal(question);
+      } catch (error) {
+        console.error('Error loading question:', error);
+        alert('Error al cargar pregunta');
+      }
+    }
+
+    async function deleteQuestion(questionId) {
+      if (!confirm('¿Eliminar esta pregunta?')) return;
+      
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/questions/${questionId}`, { method: 'DELETE' });
+        if (res.ok) {
+          showSuccess('Pregunta eliminada');
+          loadQuestions();
+        } else {
+          throw new Error('Error al eliminar pregunta');
+        }
+      } catch (error) {
+        console.error(error);
+        alert('No se pudo eliminar la pregunta');
+      }
+    }
     
-    // Load existing answers
-    const container = document.getElementById('answersContainer');
-    container.innerHTML = '';
+    function openQuestionModal(question = null) {
+      const modal = document.getElementById('questionModal');
+      const title = document.getElementById('questionModalTitle');
+      const form = document.getElementById('questionForm');
+      
+      document.getElementById('questionQuizId').value = currentQuizId;
+      
+      // Reset answer count
+      answerCount = 0;
+      
+      if (question) {
+        title.textContent = 'Editar Pregunta';
+        document.getElementById('questionId').value = question.id;
+        document.getElementById('questionText').value = question.question_text;
+        document.getElementById('questionOrder').value = question.question_order;
+        document.getElementById('questionTimeLimit').value = question.time_limit;
+        
+        // Load existing answers
+        const container = document.getElementById('answersContainer');
+        container.innerHTML = '';
+        
+        question.answers.forEach((answer, index) => {
+          addAnswerField(answer.answer_text, answer.is_correct);
+        });
+      } else {
+        title.textContent = 'Agregar Pregunta';
+        form.reset();
+        document.getElementById('questionId').value = '';
+        document.getElementById('questionQuizId').value = currentQuizId;
+        
+        // Reset answers and add 4 default fields
+        const container = document.getElementById('answersContainer');
+        container.innerHTML = '';
+        
+        for (let i = 0; i < 4; i++) {
+          addAnswerField();
+        }
+      }
+      
+      modal.classList.add('show');
+    }
     
-    question.answers.forEach((answer, index) => {
-      addAnswerField(answer.answer_text, answer.is_correct);
+    function addAnswerField(text = '', isCorrect = false) {
+      answerCount++;
+      const container = document.getElementById('answersContainer');
+      
+      const answerDiv = document.createElement('div');
+      answerDiv.className = 'form-group';
+      answerDiv.style.display = 'flex';
+      answerDiv.style.gap = '12px';
+      answerDiv.style.alignItems = 'center';
+      answerDiv.dataset.answerIndex = answerCount;
+      
+      answerDiv.innerHTML = `
+        <input type="text" class="form-input answer-text" placeholder="Respuesta ${answerCount}" value="${text}" required>
+        <label style="display: flex; align-items: center; gap: 4px; white-space: nowrap;">
+          <input type="radio" name="correctAnswer" value="${answerCount}" ${isCorrect ? 'checked' : ''}>
+          Correcta
+        </label>
+        <button type="button" class="btn btn-danger btn-small" onclick="removeAnswerField(this)">×</button>
+      `;
+      
+      container.appendChild(answerDiv);
+    }
+    
+    function removeAnswerField(button) {
+      if (document.querySelectorAll('.answer-text').length > 2) {
+        button.parentElement.remove();
+      } else {
+        alert('Debe haber al menos 2 respuestas');
+      }
+    }
+    
+    async function handleQuestionSubmit(e) {
+      e.preventDefault();
+      
+      const questionId = document.getElementById('questionId').value;
+      const answerTexts = Array.from(document.querySelectorAll('.answer-text')).map(input => input.value);
+      const correctAnswerRadio = document.querySelector('input[name="correctAnswer"]:checked');
+      
+      if (!correctAnswerRadio || answerTexts.some(text => !text.trim())) {
+        alert('Por favor completa todos los campos y marca una respuesta correcta');
+        return;
+      }
+      
+      const correctAnswerIndex = parseInt(correctAnswerRadio.value);
+      
+      const answers = answerTexts.map((text, index) => ({
+        answer_text: text,
+        is_correct: (index + 1) === correctAnswerIndex,
+        answer_order: index + 1
+      }));
+      
+      const questionData = {
+        question_text: document.getElementById('questionText').value,
+        question_order: parseInt(document.getElementById('questionOrder').value),
+        time_limit: parseInt(document.getElementById('questionTimeLimit').value),
+        answers: answers
+      };
+      
+      try {
+        let response;
+        if (questionId) {
+          // Update existing question
+          response = await fetch(`${API_BASE_URL}/api/questions/${questionId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(questionData)
+          });
+        } else {
+          // Create new question
+          response = await fetch(`${API_BASE_URL}/api/quizzes/${currentQuizId}/questions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(questionData)
+          });
+        }
+        
+        if (response.ok) {
+          closeModal('questionModal');
+          loadQuestions();
+          showSuccess(questionId ? 'Pregunta actualizada exitosamente' : 'Pregunta creada exitosamente');
+        } else {
+          throw new Error('Error en la respuesta del servidor');
+        }
+        
+      } catch (error) {
+        console.error('Error saving question:', error);
+        alert('Error al guardar la pregunta');
+      }
+    }
+    
+    // Utility Functions
+    function closeModal(modalId) {
+      document.getElementById(modalId).classList.remove('show');
+    }
+    
+    function showSuccess(message) {
+      const successDiv = document.createElement('div');
+      successDiv.className = 'success';
+      successDiv.textContent = message;
+      successDiv.style.position = 'fixed';
+      successDiv.style.top = '20px';
+      successDiv.style.right = '20px';
+      successDiv.style.zIndex = '9999';
+      successDiv.style.maxWidth = '300px';
+      
+      document.body.appendChild(successDiv);
+      
+      setTimeout(() => {
+        if (document.body.contains(successDiv)) {
+          document.body.removeChild(successDiv);
+        }
+      }, 3000);
+    }
+    
+    // Close modals when clicking outside
+    document.querySelectorAll('.modal').forEach(modal => {
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+          modal.classList.remove('show');
+        }
+      });
     });
-  } else {
-    title.textContent = 'Agregar Pregunta';
-    form.reset();
-    document.getElementById('questionId').value = '';
-    document.getElementById('questionQuizId').value = currentQuizId;
-    
-    // Reset answers and add 4 default fields
-    const container = document.getElementById('answersContainer');
-    container.innerHTML = '';
-    
-    for (let i = 0; i < 4; i++) {
-      addAnswerField();
-    }
-  }
-  
-  modal.classList.add('show');
-}
-
-function addAnswerField(text = '', isCorrect = false) {
-  answerCount++;
-  const container = document.getElementById('answersContainer');
-  
-  const answerDiv = document.createElement('div');
-  answerDiv.className = 'form-group';
-  answerDiv.style.display = 'flex';
-  answerDiv.style.gap = '12px';
-  answerDiv.style.alignItems = 'center';
-  answerDiv.dataset.answerIndex = answerCount;
-  
-  answerDiv.innerHTML = `
-    <input type="text" class="form-input answer-text" placeholder="Respuesta ${answerCount}" value="${text}" required>
-    <label style="display: flex; align-items: center; gap: 4px; white-space: nowrap;">
-      <input type="radio" name="correctAnswer" value="${answerCount}" ${isCorrect ? 'checked' : ''}>
-      Correcta
-    </label>
-    <button type="button" class="btn btn-danger btn-small" onclick="removeAnswerField(this)">×</button>
-  `;
-  
-  container.appendChild(answerDiv);
-}
-
-function removeAnswerField(button) {
-  if (document.querySelectorAll('.answer-text').length > 2) {
-    button.parentElement.remove();
-  } else {
-    alert('Debe haber al menos 2 respuestas');
-  }
-}
-
-async function handleQuestionSubmit(e) {
-  e.preventDefault();
-  
-  const questionId = document.getElementById('questionId').value;
-  const answerTexts = Array.from(document.querySelectorAll('.answer-text')).map(input => input.value);
-  const correctAnswerRadio = document.querySelector('input[name="correctAnswer"]:checked');
-  
-  if (!correctAnswerRadio || answerTexts.some(text => !text.trim())) {
-    alert('Por favor completa todos los campos y marca una respuesta correcta');
-    return;
-  }
-  
-  const correctAnswerIndex = parseInt(correctAnswerRadio.value);
-  
-  const answers = answerTexts.map((text, index) => ({
-    answer_text: text,
-    is_correct: (index + 1) === correctAnswerIndex,
-    answer_order: index + 1
-  }));
-  
-  const questionData = {
-    question_text: document.getElementById('questionText').value,
-    question_order: parseInt(document.getElementById('questionOrder').value),
-    time_limit: parseInt(document.getElementById('questionTimeLimit').value),
-    answers: answers
-  };
-  
-  try {
-    let response;
-    if (questionId) {
-      // Update existing question
-      response = await fetch(`${API_BASE_URL}/api/questions/${questionId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(questionData)
-      });
-    } else {
-      // Create new question
-      response = await fetch(`${API_BASE_URL}/api/quizzes/${currentQuizId}/questions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(questionData)
-      });
-    }
-    
-    if (response.ok) {
-      closeModal('questionModal');
-      loadQuestions();
-      showSuccess(questionId ? 'Pregunta actualizada exitosamente' : 'Pregunta creada exitosamente');
-    } else {
-      throw new Error('Error en la respuesta del servidor');
-    }
-    
-  } catch (error) {
-    console.error('Error saving question:', error);
-    alert('Error al guardar la pregunta');
-  }
-}
-
-// Utility Functions
-function closeModal(modalId) {
-  document.getElementById(modalId).classList.remove('show');
-}
-
-function showSuccess(message) {
-  const successDiv = document.createElement('div');
-  successDiv.className = 'success';
-  successDiv.textContent = message;
-  successDiv.style.position = 'fixed';
-  successDiv.style.top = '20px';
-  successDiv.style.right = '20px';
-  successDiv.style.zIndex = '9999';
-  successDiv.style.maxWidth = '300px';
-  
-  document.body.appendChild(successDiv);
-  
-  setTimeout(() => {
-    if (document.body.contains(successDiv)) {
-      document.body.removeChild(successDiv);
-    }
-  }, 3000);
-}
-
-// Close modals when clicking outside
-document.querySelectorAll('.modal').forEach(modal => {
-  modal.addEventListener('click', (e) => {
-    if (e.target === modal) {
-      modal.classList.remove('show');
-    }
-  });
-});
   </script>
 </body>
 </html>
