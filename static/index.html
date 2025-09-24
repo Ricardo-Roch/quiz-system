@@ -479,13 +479,12 @@
     function handleNameInput() {
       const name = nameInput.value.trim();
       const uni = uniInput.value.trim();
-      loginBtn.disabled = uni.length === 0 || name.length === 0;
+      loginBtn.disabled = uni.length === 0;
       hideError();
     }
 
     async function handleLogin() {
       const uni = uniInput.value.trim();
-      const name = nameInput.value.trim();
 
       if (!uni) {
         showError('Por favor ingresa tu UNI');
@@ -497,22 +496,12 @@
       hideError();
 
       try {
-        // Primero intentar obtener el usuario
+        // Solo verificar si el usuario existe
         let user = await getUser(uni);
         
         if (!user) {
-          // Si no existe y no tenemos nombre, pedirlo
-          if (!name) {
-            nameInput.style.display = 'block';
-            nameInput.focus();
-            loginBtn.textContent = 'Crear Usuario';
-            loginLoading.style.display = 'none';
-            loginBtn.disabled = name.length === 0;
-            return;
-          }
-          
-          // Crear nuevo usuario
-          user = await createUser(uni, name);
+          showError('Usuario no encontrado. Por favor verifica tu UNI.');
+          return;
         }
 
         currentUser = user;
