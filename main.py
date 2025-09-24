@@ -190,8 +190,9 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
+    expose_headers=["*"]
 )
 
 # Mount static files
@@ -601,31 +602,39 @@ def complete_participation(participation_id: int, db: Session = Depends(get_db))
 @app.get("/api/participations/")
 def get_all_participations(completed_only: bool = False, db: Session = Depends(get_db)):
     try:
-        query = db.query(Participation).join(User).join(Quiz)
         if completed_only:
-            query = query.filter(Participation.completed == True)
+            query = db.query(Participation).filter(Participation.completed == True)
+        else:
+            query = db.query(Participation)
         
         participations = query.all()
         
         result = []
         for p in participations:
             try:
+                # Verificar que las relaciones existen
+                user = db.query(User).filter(User.id == p.user_id).first()
+                quiz = db.query(Quiz).filter(Quiz.id == p.quiz_id).first()
+                
+                if not user or not quiz:
+                    continue
+                
                 # Calculate percentage safely
                 percentage = 0
-                if p.total_questions > 0:
+                if p.total_questions and p.total_questions > 0:
                     percentage = round((p.score / p.total_questions * 100), 2)
                 
                 result.append({
                     "id": p.id,
-                    "user_name": p.user.name if p.user else "Unknown",
-                    "user_uni": p.user.uni if p.user else "Unknown",
-                    "quiz_title": p.quiz.title if p.quiz else "Unknown",
-                    "score": p.score,
-                    "total_questions": p.total_questions,
+                    "user_name": user.name,
+                    "user_uni": user.uni,
+                    "quiz_title": quiz.title,
+                    "score": p.score or 0,
+                    "total_questions": p.total_questions or 0,
                     "percentage": percentage,
-                    "completed": p.completed,
-                    "started_at": p.started_at,
-                    "completed_at": p.completed_at
+                    "completed": p.completed or False,
+                    "started_at": p.started_at.isoformat() if p.started_at else None,
+                    "completed_at": p.completed_at.isoformat() if p.completed_at else None
                 })
             except Exception as e:
                 print(f"Error processing participation {p.id}: {e}")
@@ -635,7 +644,7 @@ def get_all_participations(completed_only: bool = False, db: Session = Depends(g
         
     except Exception as e:
         print(f"Error in get_all_participations: {e}")
-        raise HTTPException(status_code=500, detail="Error al obtener participaciones")
+        return []  # Devolver lista vacía en lugar de error
 
 @app.delete("/api/participations/{participation_id}")
 def delete_participation(participation_id: int, db: Session = Depends(get_db)):
@@ -654,26 +663,22 @@ def get_dashboard_statistics(db: Session = Depends(get_db)):
         total_quizzes = db.query(Quiz).count()
         active_quizzes = db.query(Quiz).filter(Quiz.is_active == True).count()
         total_users = db.query(User).count()
-        total_participations = db.query(Participation).count()
-        completed_participations = db.query(Participation).filter(Participation.completed == True).count()
-        
-        completion_rate = 0
-        if total_participations > 0:
-            completion_rate = round((completed_participations / total_participations * 100), 2)
         
         return {
             "total_quizzes": total_quizzes,
             "active_quizzes": active_quizzes,
-            "inactive_quizzes": max(0, total_quizzes - active_quizzes),
-            "total_users": total_users,
-            "total_participations": total_participations,
-            "completed_participations": completed_participations,
-            "completion_rate": completion_rate
+            "inactive_quizzes": total_quizzes - active_quizzes,
+            "total_users": total_users
         }
         
     except Exception as e:
-        print(f"Error in get_dashboard_statistics: {e}")
-        raise HTTPException(status_code=500, detail="Error al obtener estadísticas")
+        print(f"Error in dashboard stats: {e}")
+        return {
+            "total_quizzes": 0,
+            "active_quizzes": 0,
+            "inactive_quizzes": 0,
+            "total_users": 0
+        }
 
 @app.get("/api/statistics/quiz/{quiz_id}")
 def get_quiz_statistics(quiz_id: int, db: Session = Depends(get_db)):
@@ -806,26 +811,38 @@ def get_quiz_responses(quiz_id: int, db: Session = Depends(get_db)):
 
 # Middleware for better error handling
 @app.middleware("http")
-async def add_cors_headers_and_error_handling(request, call_next):
+async def add_cors_headers(request, call_next):
     try:
+        # Handle OPTIONS requests
+        if request.method == "OPTIONS":
+            return Response(
+                status_code=200,
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+                    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
+                    "Access-Control-Max-Age": "3600"
+                }
+            )
+        
         response = await call_next(request)
         
-        # Add CORS headers
+        # Add CORS headers to all responses
         response.headers["Access-Control-Allow-Origin"] = "*"
         response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
         response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With"
-        response.headers["Access-Control-Max-Age"] = "3600"
         
         return response
         
     except Exception as e:
         print(f"Middleware error: {e}")
         return Response(
-            content=f"Internal server error: {str(e)}",
+            content='{"error": "Internal server error"}',
             status_code=500,
+            media_type="application/json",
             headers={
                 "Access-Control-Allow-Origin": "*",
-                "Content-Type": "text/plain"
+                "Content-Type": "application/json"
             }
         )
 
@@ -841,7 +858,17 @@ async def options_handler(path: str):
             "Access-Control-Max-Age": "3600"
         }
     )
-
+@app.options("/{full_path:path}")
+async def options_handler(full_path: str):
+    return Response(
+        status_code=200,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
+            "Access-Control-Max-Age": "3600"
+        }
+    )
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
