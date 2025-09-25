@@ -435,11 +435,25 @@ def get_quizzes(active_only: bool = False, db: Session = Depends(get_db)):
             query = query.filter(Quiz.is_active == True)
         
         quizzes = query.order_by(Quiz.created_at.desc()).all()
-        return quizzes
+        
+        # Construir la respuesta manualmente para evitar problemas de serialización
+        result = []
+        for quiz in quizzes:
+            quiz_data = {
+                "id": quiz.id,
+                "title": quiz.title,
+                "area": quiz.area,
+                "description": quiz.description,
+                "is_active": quiz.is_active,
+                "created_at": quiz.created_at,
+                "questions_count": len(quiz.questions) if quiz.questions else 0
+            }
+            result.append(quiz_data)
+        
+        return result
         
     except Exception as e:
         logger.error(f"Error in get_quizzes: {e}")
-        # Return empty list instead of error for better UX
         return []
 
 @app.get("/api/quizzes/count")
