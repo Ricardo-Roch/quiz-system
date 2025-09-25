@@ -696,19 +696,19 @@ function showQuestion() {
   
   qIndex.textContent = currentQuestionIndex + 1;
   questionText.textContent = question.question_text;
-  answers.innerHTML = '';
+  answers.innerHTML = ''; // Limpiar completamente el contenedor
 
-  // Crear botones de respuesta
+  // Crear botones de respuesta completamente nuevos
   question.answers.forEach((answer, index) => {
     const btn = document.createElement('button');
-    btn.className = 'answer';
+    btn.className = 'answer'; // Solo la clase base
     btn.textContent = answer.answer_text;
     
-    // IMPORTANTE: Resetear estado de botones
+    // IMPORTANTE: Botones completamente habilitados y limpios
     btn.disabled = false;
     btn.style.pointerEvents = 'auto';
     
-    // CORRECCIÓN: Pasar directamente el objeto answer
+    // Asignar event handler una sola vez
     btn.onclick = () => selectAnswer(answer, index, btn);
     
     // Guardar referencia del answer en el botón
@@ -721,6 +721,22 @@ function showQuestion() {
   timeLeft = question.time_limit || TIME_PER_QUESTION;
   updateTimer();
   timer = setInterval(tick, 100);
+}
+
+// También actualizar la función timeoutAnswer para mantener consistencia
+function timeoutAnswer() {
+  const answerButtons = answers.querySelectorAll('.answer');
+  answerButtons.forEach(btn => {
+    btn.disabled = true;
+    btn.style.pointerEvents = 'none';
+    btn.onclick = null;
+    btn.style.opacity = '0.5';
+  });
+
+  setTimeout(() => {
+    currentQuestionIndex++;
+    showQuestion();
+  }, 1500);
 }
 
     function tick() {
@@ -760,6 +776,7 @@ function showQuestion() {
     }
 
 // FUNCIÓN CORREGIDA - Esta es la clave del fix
+// FUNCIÓN COMPLETAMENTE CORREGIDA
 async function selectAnswer(selectedAnswer, answerIndex, buttonEl) {
   clearTimer();
   
@@ -767,7 +784,8 @@ async function selectAnswer(selectedAnswer, answerIndex, buttonEl) {
   const allAnswerButtons = answers.querySelectorAll('.answer');
   allAnswerButtons.forEach(btn => {
     btn.disabled = true;
-    btn.style.pointerEvents = 'none'; // Extra protección
+    btn.style.pointerEvents = 'none';
+    btn.onclick = null; // Remover completamente los event handlers
   });
   
   const question = questions[currentQuestionIndex];
@@ -781,7 +799,7 @@ async function selectAnswer(selectedAnswer, answerIndex, buttonEl) {
   });
 
   try {
-    // Enviar respuesta - USAR EL ID CORRECTO
+    // Enviar respuesta al servidor
     const response = await fetch(`${API_BASE_URL}/api/participate/${participationId}/submit`, {
       method: 'POST',
       headers: {
@@ -789,7 +807,7 @@ async function selectAnswer(selectedAnswer, answerIndex, buttonEl) {
       },
       body: JSON.stringify({
         question_id: question.id,
-        answer_id: selectedAnswer.id,  // CORRECCIÓN: usar selectedAnswer.id
+        answer_id: selectedAnswer.id,
         response_time: responseTime
       })
     });
@@ -799,8 +817,8 @@ async function selectAnswer(selectedAnswer, answerIndex, buttonEl) {
       
       console.log('Resultado de la API:', result);
       
-      // Marcar SOLO la respuesta seleccionada - SIN MOSTRAR LA CORRECTA
-      allAnswerButtons.forEach((btn, index) => {
+      // SOLO marcar la respuesta seleccionada - SIN información adicional
+      allAnswerButtons.forEach((btn) => {
         const btnAnswer = btn.answerData;
         
         // Solo marcar la respuesta que el usuario seleccionó
@@ -811,14 +829,16 @@ async function selectAnswer(selectedAnswer, answerIndex, buttonEl) {
             btn.classList.add('wrong');
           }
         }
-        // NO mostrar cuál era la respuesta correcta
+        // NO hacer nada con las otras respuestas
+        // NO usar result.correct_answer_id (ya no se envía desde el servidor)
       });
 
+      // Actualizar score si es correcto
       if (result.correct) {
         score++;
       }
 
-      // Avanzar a la siguiente pregunta
+      // Avanzar a la siguiente pregunta después de 2 segundos
       setTimeout(() => {
         currentQuestionIndex++;
         showQuestion();
@@ -827,18 +847,26 @@ async function selectAnswer(selectedAnswer, answerIndex, buttonEl) {
     } else {
       const errorData = await response.json();
       console.error('Error de API:', errorData);
-      throw new Error('Error enviando respuesta');
+      
+      // En caso de error, continuar con la siguiente pregunta
+      setTimeout(() => {
+        currentQuestionIndex++;
+        showQuestion();
+      }, 1500);
     }
   } catch (error) {
     console.error('Error enviando respuesta:', error);
-    // Continuar con la siguiente pregunta aunque haya error
+    
+    // En caso de error de red, continuar con la siguiente pregunta
     setTimeout(() => {
       currentQuestionIndex++;
       showQuestion();
-    }, 1000);
+    }, 1500);
   }
 }
-    function timeoutAnswer() {
+
+
+function timeoutAnswer() {
       const answerButtons = answers.querySelectorAll('.answer');
       answerButtons.forEach(btn => {
         btn.disabled = true;

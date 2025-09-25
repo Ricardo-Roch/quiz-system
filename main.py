@@ -834,11 +834,12 @@ def submit_answer(participation_id: int, answer: SubmitAnswer, db: Session = Dep
         
         db.commit()
         
+        # CORRECCIÓN: NO revelar información sobre la respuesta correcta
+        # Solo retornar si fue correcto o no, sin más detalles
         return {
             "correct": is_correct,
-            "current_score": participation.score,
-            "correct_answer_id": correct_answer.id,
-            "explanation": f"La respuesta correcta era: {correct_answer.answer_text}"
+            "current_score": participation.score
+            # NO incluir: correct_answer_id, explanation, etc.
         }
     except HTTPException:
         raise
