@@ -696,26 +696,18 @@ function showQuestion() {
   
   qIndex.textContent = currentQuestionIndex + 1;
   questionText.textContent = question.question_text;
-  answers.innerHTML = ''; // Limpiar completamente el contenedor
+answers.innerHTML = "";
+question.answers.forEach((ans, index) => {
+  const btn = document.createElement("button");
+  btn.classList.add("answer");
+  btn.textContent = ans.answer_text;
 
-  // Crear botones de respuesta completamente nuevos
-  question.answers.forEach((answer, index) => {
-    const btn = document.createElement('button');
-    btn.className = 'answer'; // Solo la clase base
-    btn.textContent = answer.answer_text;
-    
-    // IMPORTANTE: Botones completamente habilitados y limpios
-    btn.disabled = false;
-    btn.style.pointerEvents = 'auto';
-    
-    // Asignar event handler una sola vez
-    btn.onclick = () => selectAnswer(answer, index, btn);
-    
-    // Guardar referencia del answer en el botón
-    btn.answerData = answer;
-    
-    answers.appendChild(btn);
-  });
+  // Guardar la data real del answer en cada botón
+  btn.answerData = ans;
+
+  btn.onclick = () => selectAnswer(ans, index, btn);
+  answers.appendChild(btn);
+});
 
   // Iniciar timer
   timeLeft = question.time_limit || TIME_PER_QUESTION;
@@ -775,8 +767,7 @@ function timeoutAnswer() {
       timerDisplay.classList.remove('warning');
     }
 
-// FUNCIÓN CORREGIDA - Esta es la clave del fix
-// FUNCIÓN COMPLETAMENTE CORREGIDA
+
 async function selectAnswer(selectedAnswer, answerIndex, buttonEl) {
   clearTimer();
   
@@ -818,20 +809,17 @@ async function selectAnswer(selectedAnswer, answerIndex, buttonEl) {
       console.log('Resultado de la API:', result);
       
       // SOLO marcar la respuesta seleccionada - SIN información adicional
-      allAnswerButtons.forEach((btn) => {
-        const btnAnswer = btn.answerData;
-        
-        // Solo marcar la respuesta que el usuario seleccionó
-        if (btnAnswer.id === selectedAnswer.id) {
-          if (result.correct) {
-            btn.classList.add('correct');
-          } else {
-            btn.classList.add('wrong');
-          }
-        }
-        // NO hacer nada con las otras respuestas
-        // NO usar result.correct_answer_id (ya no se envía desde el servidor)
-      });
+allAnswerButtons.forEach((btn) => {
+  const btnAnswer = btn.answerData;
+
+  if (btnAnswer && btnAnswer.id === selectedAnswer.id) {
+    if (result.correct) {
+      btn.classList.add("correct");
+    } else {
+      btn.classList.add("wrong");
+    }
+  }
+});
 
       // Actualizar score si es correcto
       if (result.correct) {
