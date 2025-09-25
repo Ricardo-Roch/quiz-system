@@ -542,10 +542,10 @@ def add_question(quiz_id: int, question: QuestionCreate, db: Session = Depends(g
         if not quiz:
             raise HTTPException(status_code=404, detail="Quiz no encontrado")
         
-        # Validate that exactly one answer is correct
+        # Validar que haya al menos una respuesta correcta
         correct_answers = [a for a in question.answers if a.is_correct]
-        if len(correct_answers) != 1:
-            raise HTTPException(status_code=400, detail="Debe haber exactamente una respuesta correcta")
+        if len(correct_answers) < 1:
+            raise HTTPException(status_code=400, detail="Debe haber al menos una respuesta correcta")
         
         db_question = Question(
             quiz_id=quiz_id,
@@ -554,9 +554,9 @@ def add_question(quiz_id: int, question: QuestionCreate, db: Session = Depends(g
             time_limit=question.time_limit
         )
         db.add(db_question)
-        db.flush()  # Get the question ID
+        db.flush()  # Obtener el ID
         
-        # Add answers
+        # Agregar respuestas
         for answer in question.answers:
             db_answer = Answer(
                 question_id=db_question.id,
@@ -574,6 +574,7 @@ def add_question(quiz_id: int, question: QuestionCreate, db: Session = Depends(g
         db.rollback()
         logger.error(f"Error adding question: {e}")
         raise HTTPException(status_code=500, detail="Error al agregar pregunta")
+
 
 @app.get("/api/questions/{question_id}")
 def get_question(question_id: int, db: Session = Depends(get_db)):
@@ -611,7 +612,7 @@ def update_question(question_id: int, question_update: QuestionUpdate, db: Sessi
         if not question:
             raise HTTPException(status_code=404, detail="Pregunta no encontrada")
         
-        # Update basic fields
+        # Actualizar campos básicos
         if question_update.question_text is not None:
             question.question_text = question_update.question_text
         if question_update.question_order is not None:
@@ -619,18 +620,18 @@ def update_question(question_id: int, question_update: QuestionUpdate, db: Sessi
         if question_update.time_limit is not None:
             question.time_limit = question_update.time_limit
         
-        # Update answers if provided
+        # Actualizar respuestas si se envían
         if question_update.answers is not None:
-            # Validate exactly one correct answer
+            # Validar al menos una correcta
             correct_answers = [a for a in question_update.answers if a.is_correct]
-            if len(correct_answers) != 1:
-                raise HTTPException(status_code=400, detail="Debe haber exactamente una respuesta correcta")
+            if len(correct_answers) < 1:
+                raise HTTPException(status_code=400, detail="Debe haber al menos una respuesta correcta")
             
-            # Delete old answers
+            # Eliminar respuestas viejas
             db.query(Answer).filter(Answer.question_id == question_id).delete(synchronize_session=False)
             db.flush()
             
-            # Create new answers
+            # Insertar nuevas
             for answer in question_update.answers:
                 db_answer = Answer(
                     question_id=question_id,
@@ -649,6 +650,7 @@ def update_question(question_id: int, question_update: QuestionUpdate, db: Sessi
         db.rollback()
         logger.error(f"Error updating question: {e}")
         raise HTTPException(status_code=500, detail="Error al actualizar pregunta")
+
 
 @app.delete("/api/questions/{question_id}")
 def delete_question(question_id: int, db: Session = Depends(get_db)):
@@ -793,7 +795,7 @@ def submit_answer(participation_id: int, answer: SubmitAnswer, db: Session = Dep
         if participation.completed:
             raise HTTPException(status_code=400, detail="Esta participación ya está completada")
         
-        # Check if already answered
+        # Revisar si ya contestó esa pregunta
         existing_response = db.query(UserResponse).filter(
             UserResponse.participation_id == participation_id,
             UserResponse.question_id == answer.question_id
@@ -802,23 +804,25 @@ def submit_answer(participation_id: int, answer: SubmitAnswer, db: Session = Dep
         if existing_response:
             raise HTTPException(status_code=400, detail="Ya respondiste esta pregunta")
         
-        # Get correct answer
-        correct_answer = db.query(Answer).filter(
+        # Obtener TODAS las correctas
+        correct_answers = db.query(Answer).filter(
             Answer.question_id == answer.question_id,
             Answer.is_correct == True
-        ).first()
+        ).all()
         
-        if not correct_answer:
+        if not correct_answers:
             raise HTTPException(status_code=400, detail="Pregunta no válida")
         
-        # Verify the submitted answer exists
+        correct_answer_ids = {a.id for a in correct_answers}
+        
+        # Verificar la respuesta enviada
         submitted_answer = db.query(Answer).filter(Answer.id == answer.answer_id).first()
         if not submitted_answer:
             raise HTTPException(status_code=400, detail="Respuesta no válida")
         
-        is_correct = (answer.answer_id == correct_answer.id)
+        is_correct = answer.answer_id in correct_answer_ids
         
-        # Save response
+        # Guardar respuesta
         user_response = UserResponse(
             participation_id=participation_id,
             question_id=answer.question_id,
@@ -828,18 +832,15 @@ def submit_answer(participation_id: int, answer: SubmitAnswer, db: Session = Dep
         )
         db.add(user_response)
         
-        # Update score
+        # Actualizar score
         if is_correct:
             participation.score += 1
         
         db.commit()
         
-        # CORRECCIÓN: NO revelar información sobre la respuesta correcta
-        # Solo retornar si fue correcto o no, sin más detalles
         return {
             "correct": is_correct,
             "current_score": participation.score
-            # NO incluir: correct_answer_id, explanation, etc.
         }
     except HTTPException:
         raise
@@ -847,6 +848,7 @@ def submit_answer(participation_id: int, answer: SubmitAnswer, db: Session = Dep
         db.rollback()
         logger.error(f"Error submitting answer: {e}")
         raise HTTPException(status_code=500, detail="Error al enviar respuesta")
+
 
 @app.post("/api/participate/{participation_id}/complete")
 def complete_participation(participation_id: int, db: Session = Depends(get_db)):
