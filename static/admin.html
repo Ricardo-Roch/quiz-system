@@ -1776,20 +1776,28 @@ function openQuestionModal(question = null) {
   modal.classList.add('show');
 }
 
-function addAnswerField(answer = {}) {
+function addAnswerField(text = '', isCorrect = false) {
   answerCount++;
-  const container = document.createElement('div');
-  container.classList.add('form-group');
-  container.innerHTML = `
-    <input type="text" class="form-input" placeholder="Respuesta" value="${answer.answer_text || ''}" data-answer-id="${answer.id || ''}">
-    <label style="margin-left:8px;">
-      <input type="checkbox" ${answer.is_correct ? 'checked' : ''}> Correcta
+  const container = document.getElementById('answersContainer');
+  
+  const answerDiv = document.createElement('div');
+  answerDiv.className = 'form-group';
+  answerDiv.style.display = 'flex';
+  answerDiv.style.gap = '12px';
+  answerDiv.style.alignItems = 'center';
+  answerDiv.dataset.answerIndex = answerCount;
+  
+  answerDiv.innerHTML = `
+    <input type="text" class="form-input answer-text" placeholder="Respuesta ${answerCount}" value="${text}" required>
+    <label style="display: flex; align-items: center; gap: 4px; white-space: nowrap;">
+      <input type="radio" name="correctAnswer" value="${answerCount}" ${isCorrect ? 'checked' : ''}>
+      Correcta
     </label>
-    <button type="button" class="btn btn-danger btn-small" onclick="this.parentElement.remove()">Eliminar</button>
+    <button type="button" class="btn btn-danger btn-small" onclick="removeAnswerField(this)">×</button>
   `;
-  document.getElementById('answersContainer').appendChild(container);
+  
+  container.appendChild(answerDiv);
 }
-
 
 function removeAnswerField(button) {
   if (document.querySelectorAll('.answer-text').length > 2) {
@@ -1801,44 +1809,62 @@ function removeAnswerField(button) {
 
 async function handleQuestionSubmit(e) {
   e.preventDefault();
-  const quizId = document.getElementById('questionQuizId').value;
+  
   const questionId = document.getElementById('questionId').value;
-  const questionText = document.getElementById('questionText').value;
-  const order = parseInt(document.getElementById('questionOrder').value);
-  const timeLimit = parseInt(document.getElementById('questionTimeLimit').value);
-
-  const answers = Array.from(document.querySelectorAll('#answersContainer .form-group')).map(group => ({
-    answer_text: group.querySelector('input[type="text"]').value,
-    is_correct: group.querySelector('input[type="checkbox"]').checked
+  const answerTexts = Array.from(document.querySelectorAll('.answer-text')).map(input => input.value);
+  const correctAnswerRadio = document.querySelector('input[name="correctAnswer"]:checked');
+  
+  if (!correctAnswerRadio || answerTexts.some(text => !text.trim())) {
+    alert('Por favor completa todos los campos y marca una respuesta correcta');
+    return;
+  }
+  
+  const correctAnswerIndex = parseInt(correctAnswerRadio.value);
+  
+  const answers = answerTexts.map((text, index) => ({
+    answer_text: text,
+    is_correct: (index + 1) === correctAnswerIndex,
+    answer_order: index + 1
   }));
-
-  const payload = {
-    quiz_id: quizId,
-    question_text: questionText,
-    order,
-    time_limit: timeLimit,
-    answers
+  
+  const questionData = {
+    question_text: document.getElementById('questionText').value,
+    question_order: parseInt(document.getElementById('questionOrder').value),
+    time_limit: parseInt(document.getElementById('questionTimeLimit').value),
+    answers: answers
   };
-
-  const method = questionId ? 'PUT' : 'POST';
-  const url = questionId 
-    ? `${API_BASE_URL}/api/questions/${questionId}`
-    : `${API_BASE_URL}/api/questions/`;
-
-  const response = await fetch(url, {
-    method,
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  });
-
-  if (response.ok) {
-    closeModal('questionModal');
-    loadQuestions(quizId);
-  } else {
+  
+  try {
+    let response;
+    if (questionId) {
+      // Update existing question
+      response = await fetch(`${API_BASE_URL}/api/questions/${questionId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(questionData)
+      });
+    } else {
+      // Create new question
+      response = await fetch(`${API_BASE_URL}/api/quizzes/${currentQuizId}/questions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(questionData)
+      });
+    }
+    
+    if (response.ok) {
+      closeModal('questionModal');
+      loadQuestions();
+      showSuccess(questionId ? 'Pregunta actualizada exitosamente' : 'Pregunta creada exitosamente');
+    } else {
+      throw new Error('Error en la respuesta del servidor');
+    }
+    
+  } catch (error) {
+    console.error('Error saving question:', error);
     alert('Error al guardar la pregunta');
   }
 }
-
 
 // Utility Functions
 function closeModal(modalId) {
