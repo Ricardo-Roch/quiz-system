@@ -1151,28 +1151,67 @@ async function loadLeaderboard(quizId) {
   }
 }
 
+// Reemplaza tu loadResponsesTable por esta versión.
+// Usa el endpoint /api/quizzes/{quiz_id}/responses si está disponible (más eficiente).
+// Si no existe, intenta por participaciones: /api/participations/?completed_only=true&quiz_id=...
 async function loadResponsesTable(quizId) {
   try {
-    // Obtener información del quiz
+    // Indicador de carga
+    document.getElementById('responsesTable').innerHTML = `<div class="loading">Cargando respuestas...</div>`;
+
+    // Intentar obtener el quiz (opcional, para validaciones / título)
     const quizResponse = await fetch(`${API_BASE_URL}/api/quizzes/${quizId}`);
-    const quiz = await quizResponse.json();
     
-    // Obtener participaciones del quiz
-    const participationsResponse = await fetch(`${API_BASE_URL}/api/participations/?completed_only=true&quiz_id=${quizId}`);
-    const participations = await participationsResponse.json();
+    if (!quizResponse.ok) {
+      throw new Error(`Quiz ${quizId} no encontrado (status ${quizResponse.status})`);
+    }
+    const quiz = await quizResponse.json();
 
+    // Primero intentar el endpoint que devuelve todas las respuestas del quiz
     let responses = [];
-
-    for (const participation of participations) {
-      // Llamar al endpoint de respuestas reales
-      const res = await fetch(`${API_BASE_URL}/api/participations/${participation.id}/responses`);
-      const data = await res.json();
-      responses = responses.concat(data);
+    const responsesResp = await fetch(`${API_BASE_URL}/api/quizzes/${quizId}/responses`);
+    responses = await responsesResp.json();
+    if (responsesResp.ok) {
+      responses = await responsesResp.json();
+    } else {
+      // Fallback: pedir participations completadas del quiz y luego las respuestas por participation
+      console.warn('/api/quizzes/{id}/responses no disponible, usando fallback por participations');
+      const partsResp = await fetch(`${API_BASE_URL}/api/participations/?completed_only=true&quiz_id=${quizId}`);
+      if (!partsResp.ok) {
+        throw new Error('No se pudieron obtener participaciones: ' + partsResp.status);
+      }
+      const parts = await partsResp.json();
+      // Pedir las respuestas por cada participación en paralelo
+      const responsesByPart = await Promise.all(parts.map(async (p) => {
+        try {
+          const r = await fetch(`${API_BASE_URL}/api/participations/${p.id}/responses`);
+          if (!r.ok) return [];
+          return await r.json();
+        } catch (e) {
+          console.error('Error al pedir respuestas de participation', p.id, e);
+          return [];
+        }
+      }));
+      responses = responsesByPart.flat();
     }
 
-    currentResponsesData = responses;
+    // Normalizar y asegurarse de campos mínimos
+    responses = (Array.isArray(responses) ? responses : []).map(r => ({
+      user_name: r.user_name || r.user_name || 'Usuario',
+      user_uni: r.user_uni || r.user_uni || 'N/A',
+      question_order: r.question_order ?? r.question_id ?? 0,
+      question_text: (r.question_text || r.question_text || '').toString(),
+      answer_text: r.answer_text || r.answer_text || 'N/A',
+      is_correct: !!r.is_correct,
+      response_time: r.response_time ?? 0,
+      completed_at: r.answered_at || r.completed_at || r.answeredAt || null
+    }));
 
-    if (responses.length === 0) {
+    // Guardar para exportación / uso global
+    window.currentResponsesData = responses;
+
+    if (!responses.length) {
+      // Mostrar tabla vacía
       document.getElementById('responsesTable').innerHTML = `
         <div class="responses-table">
           <table class="table table-striped table-compact">
@@ -1191,18 +1230,85 @@ async function loadResponsesTable(quizId) {
       return;
     }
 
-    // Ordenar respuestas
+    // Ordenar antes de renderizar
     responses.sort((a, b) => {
-      if (a.user_uni !== b.user_uni) return a.user_uni.localeCompare(b.user_uni);
-      return a.question_order - b.question_order;
+      if (a.user_uni !== b.user_uni) return String(a.user_uni).localeCompare(String(b.user_uni));
+      return (a.question_order || 0) - (b.question_order || 0);
     });
 
-    // Aquí ya renderizas la tabla con respuestas reales
+    // Renderizar tabla
     renderResponsesTable(responses);
 
-  } catch (err) {
-    console.error("Error cargando respuestas:", err);
+  } catch (error) {
+    console.error('Error loading responses table:', error);
+    document.getElementById('responsesTable').innerHTML = `
+      <div class="error">Error al cargar respuestas: ${error.message || error}</div>
+    `;
   }
+}
+
+// Función que genera la tabla HTML desde un array de responses
+function renderResponsesTable(responses) {
+  const tableRows = responses.map(response => {
+    const correctClass = response.is_correct ? 'correct-answer' : 'incorrect-answer';
+    const correctIcon = response.is_correct ? '✓' : '✗';
+    const timeDisplay = `${response.response_time ?? 0}ms`;
+    const dateDisplay = response.completed_at ? formatDate(response.completed_at) : '—';
+
+    // Escapar valores para evitar inyección básica
+    const user_name = escapeHtml(response.user_name);
+    const user_uni = escapeHtml(response.user_uni);
+    const q_text = escapeHtml(response.question_text);
+    const a_text = escapeHtml(response.answer_text);
+
+    return `
+      <tr>
+        <td>${user_name}</td>
+        <td><strong>${user_uni}</strong></td>
+        <td>${response.question_order}</td>
+        <td style="max-width: 300px; word-wrap: break-word;">${q_text}</td>
+        <td style="max-width: 200px; word-wrap: break-word;">${a_text}</td>
+        <td class="${correctClass}">${correctIcon} ${response.is_correct ? 'Sí' : 'No'}</td>
+        <td class="response-time">${timeDisplay}</td>
+        <td>${dateDisplay}</td>
+      </tr>
+    `;
+  }).join('');
+
+  document.getElementById('responsesTable').innerHTML = `
+    <div class="responses-table">
+      <table class="table table-striped table-compact">
+        <thead>
+          <tr>
+            <th>Usuario</th><th>UNI</th><th>Pregunta #</th><th>Pregunta</th>
+            <th>Respuesta Seleccionada</th><th>Correcta</th><th>Tiempo (ms)</th><th>Fecha</th>
+          </tr>
+        </thead>
+        <tbody>${tableRows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+// Pequeñas utilidades
+function formatDate(dateStr) {
+  try {
+    const d = new Date(dateStr);
+    // Formato local en español (México), ajusta si quieres otro locale
+    return d.toLocaleString('es-MX');
+  } catch (e) {
+    return dateStr;
+  }
+}
+
+function escapeHtml(text) {
+  if (text === null || text === undefined) return '';
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }
 
 

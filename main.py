@@ -1032,6 +1032,53 @@ def debug_participations(db: Session = Depends(get_db)):
     except Exception as e:
         return {"error": str(e)}
 
+@app.get("/api/quizzes/{quiz_id}/responses")
+def get_quiz_responses(quiz_id: int, db: Session = Depends(get_db)):
+    try:
+        responses = (
+            db.query(
+                UserResponse.id,
+                UserResponse.is_correct,
+                UserResponse.response_time,
+                UserResponse.answered_at,
+                Question.question_order,
+                Question.question_text,
+                Answer.answer_text,
+                User.name.label("user_name"),
+                User.uni.label("user_uni"),
+                Participation.completed_at,
+                Participation.id.label("participation_id")
+            )
+            .join(Participation, UserResponse.participation_id == Participation.id)
+            .join(User, Participation.user_id == User.id)
+            .outerjoin(Question, UserResponse.question_id == Question.id)
+            .outerjoin(Answer, UserResponse.answer_id == Answer.id)
+            .filter(Participation.quiz_id == quiz_id)
+            .all()
+        )
+
+        result = []
+        for r in responses:
+            result.append({
+                "participation_id": r.participation_id,
+                "user_name": r.user_name,
+                "user_uni": r.user_uni,
+                "question_order": r.question_order,
+                "question_text": r.question_text,
+                "answer_text": r.answer_text,
+                "is_correct": r.is_correct,
+                "response_time": r.response_time,
+                "answered_at": r.answered_at,
+                "completed_at": r.completed_at,
+            })
+        
+        return result
+
+    except Exception as e:
+        logger.error(f"Error fetching quiz responses: {e}")
+        raise HTTPException(status_code=500, detail="Error al obtener respuestas del quiz")
+
+
 @app.delete("/api/participations/{participation_id}")
 def delete_participation(participation_id: int, db: Session = Depends(get_db)):
     try:
