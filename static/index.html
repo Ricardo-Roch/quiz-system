@@ -653,7 +653,6 @@ function handleNameInput() {
 
 async function handleLogin() {
   const uni = uniInput.value.trim();
-  const name = nameInput.value.trim();
 
   if (!uni) {
     showError('Por favor ingresa tu UNI');
@@ -667,27 +666,19 @@ async function handleLogin() {
   try {
     console.log('Attempting to login with UNI:', uni);
     
-    // Usar el endpoint correcto que espera UNI como string
+    // Obtener usuario existente
     let user = await getUser(uni);
     
     if (!user) {
-      // Si el usuario no existe y tenemos nombre, crear usuario
-      if (name) {
-        console.log('Creating new user with UNI:', uni, 'and name:', name);
-        user = await createUser(uni, name);
-      } else {
-        // Mostrar campo de nombre si no existe el usuario
-        nameInput.style.display = 'block';
-        loginBtn.textContent = 'Crear Usuario';
-        showError('Usuario no encontrado. Ingresa tu nombre para crear una cuenta nueva.');
-        return;
-      }
+      // Usuario no existe, no se permite registrar
+      showError('Usuario no encontrado. No puedes registrarte aquí.');
+      return;
     }
 
     console.log('User authenticated:', user);
     currentUser = user;
     
-    // Save user session
+    // Guardar sesión del usuario
     saveUserSession(user);
     
     await loadQuizzes();
