@@ -439,7 +439,7 @@
 
       <!-- Área de Preguntas -->
       <div id="questionArea" style="display:none;width:100%">
-     <button class="back-btn" id="backBtn">← Salir del Quiz</button>
+        <button class="back-btn" id="backBtn">← Salir del Quiz</button>
 
         <div class="meta">
           <div>Pregunta <span id="qindex">1</span> de <span id="qtotal">1</span></div>
@@ -474,7 +474,6 @@
   <div class="brand-footer">
     <img src="logooIO.png" alt="Powered by" class="brand-logo" />
   </div>
-
 
   <script>
     // Configuración
@@ -699,12 +698,18 @@
       questionText.textContent = question.question_text;
       answers.innerHTML = '';
 
-      // Crear botones de respuesta
+      // Crear botones de respuesta - AQUÍ ESTÁ EL FIX PRINCIPAL
       question.answers.forEach((answer, index) => {
         const btn = document.createElement('button');
         btn.className = 'answer';
         btn.textContent = answer.answer_text;
-        btn.onclick = () => selectAnswer(answer.id, index, btn);
+        
+        // CORRECCIÓN: Pasar directamente el objeto answer en lugar del ID
+        btn.onclick = () => selectAnswer(answer, index, btn);
+        
+        // Guardar referencia del answer en el botón para facilitar el acceso
+        btn.answerData = answer;
+        
         answers.appendChild(btn);
       });
 
@@ -750,14 +755,22 @@
       timerDisplay.classList.remove('warning');
     }
 
-    async function selectAnswer(answerId, answerIndex, buttonEl) {
+    // FUNCIÓN CORREGIDA - Esta es la clave del fix
+    async function selectAnswer(selectedAnswer, answerIndex, buttonEl) {
       clearTimer();
       
       const question = questions[currentQuestionIndex];
       const responseTime = Math.round(((question.time_limit || TIME_PER_QUESTION) - timeLeft) * 1000);
 
+      console.log('Respuesta seleccionada:', {
+        questionId: question.id,
+        selectedAnswer: selectedAnswer,
+        answerId: selectedAnswer.id,
+        answerText: selectedAnswer.answer_text
+      });
+
       try {
-        // Enviar respuesta
+        // Enviar respuesta - USAR EL ID CORRECTO
         const response = await fetch(`${API_BASE_URL}/api/participate/${participationId}/submit`, {
           method: 'POST',
           headers: {
@@ -765,7 +778,7 @@
           },
           body: JSON.stringify({
             question_id: question.id,
-            answer_id: answerId,
+            answer_id: selectedAnswer.id,  // CORRECCIÓN: usar selectedAnswer.id
             response_time: responseTime
           })
         });
@@ -773,32 +786,33 @@
         if (response.ok) {
           const result = await response.json();
           
-          // Marcar respuestas
+          console.log('Resultado de la API:', result);
+          
+          // Marcar respuestas - LÓGICA CORREGIDA
           const answerButtons = answers.querySelectorAll('.answer');
           answerButtons.forEach((btn, index) => {
             btn.disabled = true;
             
-            // Encontrar la respuesta correcta
-            const answerData = question.answers[index];
-            const isCorrectAnswer = question.answers.some(a => 
-              a.id === answerData.id && result.correct && answerId === a.id
-            );
+            const btnAnswer = btn.answerData;
             
-            if (result.correct && answerId === question.answers[index].id) {
+            // Marcar la respuesta correcta (basado en la respuesta de la API)
+            if (btnAnswer.id === result.correct_answer_id) {
               btn.classList.add('correct');
-            } else if (!result.correct && answerId === question.answers[index].id) {
+            }
+            
+            // Marcar la respuesta seleccionada si es incorrecta
+            if (btnAnswer.id === selectedAnswer.id && !result.correct) {
               btn.classList.add('wrong');
             }
           });
 
-          // Mostrar respuesta correcta
-          question.answers.forEach((answer, index) => {
-            // Aquí necesitaríamos saber cuál es la correcta desde la API
-            // Por ahora solo marcamos si fue correcta la seleccionada
-          });
-
           if (result.correct) {
             score++;
+          }
+
+          // Mostrar mensaje de explicación si está disponible
+          if (result.explanation) {
+            console.log('Explicación:', result.explanation);
           }
 
           // Avanzar a la siguiente pregunta
@@ -808,6 +822,8 @@
           }, 2000);
           
         } else {
+          const errorData = await response.json();
+          console.error('Error de API:', errorData);
           throw new Error('Error enviando respuesta');
         }
       } catch (error) {
@@ -865,59 +881,59 @@
       }
     }
 
-    function displayResults(result) {
-      const percentage = result.percentage;
-      
-      // Título basado en el resultado
-      if (percentage >= 90) {
-        scoreTitle.textContent = '¡Excelente trabajo!';
-        scoreDisplay.className = 'score-display score-excellent';
-      } else if (percentage >= 70) {
-        scoreTitle.textContent = '¡Muy bien!';
-        scoreDisplay.className = 'score-display score-good';
-      } else if (percentage >= 50) {
-        scoreTitle.textContent = '¡Buen intento!';
-        scoreDisplay.className = 'score-display score-fair';
-      } else {
-        scoreTitle.textContent = 'Sigue practicando';
-        scoreDisplay.className = 'score-display score-poor';
-      }
+ function displayResults(result) {
+  const percentage = result.percentage;
+  
+  // Título basado en el resultado
+  if (percentage >= 90) {
+    scoreTitle.textContent = '¡Excelente trabajo!';
+    scoreDisplay.className = 'score-display score-excellent';
+  } else if (percentage >= 70) {
+    scoreTitle.textContent = '¡Muy bien!';
+    scoreDisplay.className = 'score-display score-good';
+  } else if (percentage >= 50) {
+    scoreTitle.textContent = '¡Buen intento!';
+    scoreDisplay.className = 'score-display score-fair';
+  } else {
+    scoreTitle.textContent = 'Sigue practicando';
+    scoreDisplay.className = 'score-display score-poor';
+  }
 
-      // Mostrar puntuación
-      scoreText.innerHTML = `
-        <div style="font-size: 48px; margin-bottom: 8px;">${result.score}/${result.total_questions}</div>
-        <div style="font-size: 20px;">${percentage}% Correcto</div>
-      `;
+  // Mostrar puntuación
+  scoreText.innerHTML = `
+    <div style="font-size: 48px; margin-bottom: 8px;">${result.score}/${result.total_questions}</div>
+    <div style="font-size: 20px;">${percentage}% Correcto</div>
+  `;
 
-      resultMessage.textContent = `¡Gracias por participar en "${currentQuiz.title}"!`;
-    }
+  resultMessage.textContent = `¡Gracias por participar en "${currentQuiz.title}"!`;
+}
 
-    function restartQuiz() {
-      // Reset del juego
-      currentQuestionIndex = 0;
-      score = 0;
-      participationId = null;
-      
-      results.style.display = 'none';
-      startScreen.style.display = 'block';
-    }
+function restartQuiz() {
+  // Reset del juego
+  currentQuestionIndex = 0;
+  score = 0;
+  participationId = null;
+  
+  results.style.display = 'none';
+  startScreen.style.display = 'block';
+}
 
-    function exitQuiz() {
-      if (confirm('¿Estás seguro de que quieres salir del quiz? Se perderá tu progreso.')) {
-        goHome();
-      }
-    }
+function exitQuiz() {
+  if (confirm('¿Estás seguro de que quieres salir del quiz? Se perderá tu progreso.')) {
+    goHome();
+  }
+}
 
-    function goHome() {
-      window.location.href = 'index.html';
-    }
+function goHome() {
+  window.location.href = 'index.html';
+}
 
-    function showError(message) {
-      errorDiv.textContent = message;
-      errorDiv.style.display = 'block';
-      loadingDiv.style.display = 'none';
-    }
+function showError(message) {
+  errorDiv.textContent = message;
+  errorDiv.style.display = 'block';
+  loadingDiv.style.display = 'none';
+}
 
-  </script>
+</script>
 </body>
 </html>
