@@ -1157,31 +1157,32 @@ async function loadLeaderboard(quizId) {
 async function loadResponsesTable(quizId) {
   try {
     // Indicador de carga
-    document.getElementById('responsesTable').innerHTML = `<div class="loading">Cargando respuestas...</div>`;
+    document.getElementById('responsesTable').innerHTML = `
+      <div class="loading">Cargando respuestas...</div>
+    `;
 
     // Intentar obtener el quiz (opcional, para validaciones / título)
     const quizResponse = await fetch(`${API_BASE_URL}/api/quizzes/${quizId}`);
-    
     if (!quizResponse.ok) {
       throw new Error(`Quiz ${quizId} no encontrado (status ${quizResponse.status})`);
     }
     const quiz = await quizResponse.json();
 
-    // Primero intentar el endpoint que devuelve todas las respuestas del quiz
+    // Usar el nuevo endpoint de respuestas
     let responses = [];
     const responsesResp = await fetch(`${API_BASE_URL}/api/quizzes/${quizId}/responses`);
-    responses = await responsesResp.json();
+
     if (responsesResp.ok) {
       responses = await responsesResp.json();
     } else {
-      // Fallback: pedir participations completadas del quiz y luego las respuestas por participation
       console.warn('/api/quizzes/{id}/responses no disponible, usando fallback por participations');
       const partsResp = await fetch(`${API_BASE_URL}/api/participations/?completed_only=true&quiz_id=${quizId}`);
       if (!partsResp.ok) {
         throw new Error('No se pudieron obtener participaciones: ' + partsResp.status);
       }
       const parts = await partsResp.json();
-      // Pedir las respuestas por cada participación en paralelo
+
+      // Pedir las respuestas por cada participación
       const responsesByPart = await Promise.all(parts.map(async (p) => {
         try {
           const r = await fetch(`${API_BASE_URL}/api/participations/${p.id}/responses`);
@@ -1195,23 +1196,23 @@ async function loadResponsesTable(quizId) {
       responses = responsesByPart.flat();
     }
 
-    // Normalizar y asegurarse de campos mínimos
+    // Normalizar los datos
     responses = (Array.isArray(responses) ? responses : []).map(r => ({
-      user_name: r.user_name || r.user_name || 'Usuario',
-      user_uni: r.user_uni || r.user_uni || 'N/A',
+      user_name: r.user_name || 'Usuario',
+      user_uni: r.user_uni || 'N/A',
       question_order: r.question_order ?? r.question_id ?? 0,
-      question_text: (r.question_text || r.question_text || '').toString(),
-      answer_text: r.answer_text || r.answer_text || 'N/A',
+      question_text: (r.question_text || '').toString(),
+      answer_text: r.answer_text || 'N/A',
       is_correct: !!r.is_correct,
       response_time: r.response_time ?? 0,
       completed_at: r.answered_at || r.completed_at || r.answeredAt || null
     }));
 
-    // Guardar para exportación / uso global
+    // Guardar global
     window.currentResponsesData = responses;
 
+    // Si no hay datos
     if (!responses.length) {
-      // Mostrar tabla vacía
       document.getElementById('responsesTable').innerHTML = `
         <div class="responses-table">
           <table class="table table-striped table-compact">
