@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, Response
@@ -14,6 +14,8 @@ from typing import List, Optional
 import os
 import logging
 from enum import Enum
+import shutil
+import uuid
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
