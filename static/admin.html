@@ -1077,24 +1077,25 @@ async function handleQuizSelectChange(e) {
 
 async function loadLeaderboard(quizId) {
   try {
-    // Usar endpoint existente de participaciones generales y filtrar
+    // 1. Obtener todas las participaciones completadas
     const response = await fetch(`${API_BASE_URL}/api/participations/?completed_only=true`);
-    
     if (!response.ok) {
-      throw new Error('Error al obtener participaciones');
+      throw new Error("Error al obtener participaciones");
     }
-    
     const allParticipations = await response.json();
-    
-    // Obtener información del quiz seleccionado
+
+    // 2. Obtener el quiz actual
     const quizResponse = await fetch(`${API_BASE_URL}/api/quizzes/${quizId}`);
+    if (!quizResponse.ok) {
+      throw new Error("Quiz no encontrado");
+    }
     const selectedQuiz = await quizResponse.json();
-    
-    // Filtrar participaciones por el quiz seleccionado
-    const participations = allParticipations.filter(p => p.quiz_title === selectedQuiz.title);
-    
+
+    // 3. Filtrar participaciones por quiz_id
+    const participations = allParticipations.filter(p => p.quiz_id === quizId);
+
     if (participations.length === 0) {
-      document.getElementById('leaderboard').innerHTML = `
+      document.getElementById("leaderboard").innerHTML = `
         <div class="empty-leaderboard">
           <div class="icon">🏆</div>
           <h4>No hay participaciones aún</h4>
@@ -1103,21 +1104,25 @@ async function loadLeaderboard(quizId) {
       `;
       return;
     }
-    
-    // Ordenar por porcentaje y luego por score
+
+    // 4. Ordenar ranking: primero % y después score
     const rankings = participations.sort((a, b) => {
       if (b.percentage !== a.percentage) {
         return b.percentage - a.percentage;
       }
       return b.score - a.score;
     });
-    
-    // Generar HTML del leaderboard
+
+    // 5. Guardar datos globales (para exportar/graficar después)
+    window.currentLeaderboardData = rankings;
+
+    // 6. Generar HTML
     const leaderboardHtml = rankings.map((participant, index) => {
       const rank = index + 1;
-      const rankClass = rank <= 3 ? `rank-${rank}` : '';
-      const totalScore = Math.round(participant.percentage * 10); // Score basado en porcentaje
-      
+      const rankClass = rank <= 3 ? `rank-${rank}` : "";
+      const totalScore = `${participant.score}/${participant.total_questions}`;
+      const percent = `${participant.percentage.toFixed(1)}%`;
+
       return `
         <div class="leaderboard-item ${rankClass}">
           <div class="rank-info">
@@ -1128,141 +1133,27 @@ async function loadLeaderboard(quizId) {
             </div>
           </div>
           <div class="score-info">
-            <div class="total-score">${totalScore}</div>
+            <div class="percentage">${percent}</div>
             <div class="score-details">
-              ${participant.score}/${participant.total_questions} correctas
-              <br>
-              ${participant.percentage.toFixed(1)}% precisión
+              ${totalScore} correctas
             </div>
           </div>
         </div>
       `;
-    }).join('');
-    
-    document.getElementById('leaderboard').innerHTML = leaderboardHtml;
-    
+    }).join("");
+
+    document.getElementById("leaderboard").innerHTML = leaderboardHtml;
+
   } catch (error) {
-    console.error('Error in loadLeaderboard:', error);
-    document.getElementById('leaderboard').innerHTML = `
+    console.error("Error en loadLeaderboard:", error);
+    document.getElementById("leaderboard").innerHTML = `
       <div class="error">
-        Error al cargar el ranking: ${error.message}
+        ❌ Error al cargar el ranking: ${error.message}
       </div>
     `;
   }
 }
 
-async function loadResponsesTable(quizId) {
-  try {
-    // Obtener información del quiz
-    const quizResponse = await fetch(`${API_BASE_URL}/api/quizzes/${quizId}`);
-    const quiz = await quizResponse.json();
-    
-    // Obtener participaciones del quiz
-    const participationsResponse = await fetch(`${API_BASE_URL}/api/participations/?completed_only=true`);
-    const allParticipations = await participationsResponse.json();
-    
-    // Filtrar por el quiz seleccionado
-    const participations = allParticipations.filter(p => p.quiz_title === quiz.title);
-    
-    // Generar respuestas simuladas (ya que no tienes endpoint de respuestas detalladas)
-    const responses = [];
-    
-    for (const participation of participations) {
-      // Para cada pregunta del quiz, simular respuestas
-      quiz.questions.forEach((question, index) => {
-        // Simular si fue correcta basado en el score total
-        const correctProbability = participation.percentage / 100;
-        const isCorrect = Math.random() < correctProbability;
-        
-        // Seleccionar una respuesta
-        const correctAnswer = question.answers.find(a => a.is_correct);
-        const incorrectAnswers = question.answers.filter(a => !a.is_correct);
-        const selectedAnswer = isCorrect && correctAnswer ? correctAnswer : 
-                             (incorrectAnswers.length > 0 ? incorrectAnswers[Math.floor(Math.random() * incorrectAnswers.length)] : question.answers[0]);
-        
-        responses.push({
-          user_name: participation.user_name,
-          user_uni: participation.user_uni,
-          question_order: question.question_order,
-          question_text: question.question_text,
-          answer_text: selectedAnswer ? selectedAnswer.answer_text : 'N/A',
-          is_correct: isCorrect,
-          response_time: Math.floor(Math.random() * 25000) + 5000,
-          completed_at: participation.completed_at
-        });
-      });
-    }
-    
-    // Guardar para exportación
-    currentResponsesData = responses;
-    
-    if (responses.length === 0) {
-      document.getElementById('responsesTable').innerHTML = `
-        <div class="responses-table">
-          <table class="table table-striped table-compact">
-            <thead>
-              <tr>
-                <th>Usuario</th><th>UNI</th><th>Pregunta #</th><th>Pregunta</th>
-                <th>Respuesta Seleccionada</th><th>Correcta</th><th>Tiempo (ms)</th><th>Fecha</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr><td colspan="8" class="empty-table">No hay respuestas registradas</td></tr>
-            </tbody>
-          </table>
-        </div>
-      `;
-      return;
-    }
-    
-    // Ordenar respuestas
-    responses.sort((a, b) => {
-      if (a.user_uni !== b.user_uni) return a.user_uni.localeCompare(b.user_uni);
-      return a.question_order - b.question_order;
-    });
-    
-    // Generar tabla
-    const tableRows = responses.map(response => {
-      const correctClass = response.is_correct ? 'correct-answer' : 'incorrect-answer';
-      const correctIcon = response.is_correct ? '✓' : '✗';
-      const timeDisplay = `${response.response_time}ms`;
-      const dateDisplay = new Date(response.completed_at).toLocaleString();
-      
-      return `
-        <tr>
-          <td>${response.user_name}</td>
-          <td><strong>${response.user_uni}</strong></td>
-          <td>${response.question_order}</td>
-          <td style="max-width: 300px; word-wrap: break-word;">${response.question_text}</td>
-          <td style="max-width: 200px; word-wrap: break-word;">${response.answer_text}</td>
-          <td class="${correctClass}">${correctIcon} ${response.is_correct ? 'Sí' : 'No'}</td>
-          <td class="response-time">${timeDisplay}</td>
-          <td>${dateDisplay}</td>
-        </tr>
-      `;
-    }).join('');
-    
-    document.getElementById('responsesTable').innerHTML = `
-      <div class="responses-table">
-        <table class="table table-striped table-compact">
-          <thead>
-            <tr>
-              <th>Usuario</th><th>UNI</th><th>Pregunta #</th><th>Pregunta</th>
-              <th>Respuesta Seleccionada</th><th>Correcta</th><th>Tiempo (ms)</th><th>Fecha</th>
-            </tr>
-          </thead>
-          <tbody>${tableRows}</tbody>
-        </table>
-      </div>
-    `;
-    
-  } catch (error) {
-    console.error('Error loading responses table:', error);
-    document.getElementById('responsesTable').innerHTML = `
-      <div class="error">Error al cargar respuestas: ${error.message}</div>
-    `;
-  }
-}
 
 function exportResponses() {
   if (currentResponsesData.length === 0) {

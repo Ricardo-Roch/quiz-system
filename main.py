@@ -1046,6 +1046,7 @@ def get_quiz_statistics(quiz_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail="Error al obtener estadísticas del quiz")
 
 # Enhanced responses endpoint
+# Obtener todas las respuestas de un quiz (versión correcta)
 @app.get("/api/quizzes/{quiz_id}/responses")
 def get_quiz_responses(quiz_id: int, db: Session = Depends(get_db)):
     try:
@@ -1053,7 +1054,7 @@ def get_quiz_responses(quiz_id: int, db: Session = Depends(get_db)):
         if not quiz:
             raise HTTPException(status_code=404, detail="Quiz no encontrado")
         
-        # Get all responses for this quiz through participations
+        # Obtener todas las respuestas asociadas al quiz
         responses = (
             db.query(UserResponse)
             .join(Participation)
@@ -1067,18 +1068,25 @@ def get_quiz_responses(quiz_id: int, db: Session = Depends(get_db)):
         result = []
         for response in responses:
             try:
-                # Get the correct answer for context
-                correct_answer = db.query(Answer).filter(
-                    Answer.question_id == response.question_id,
-                    Answer.is_correct == True
-                ).first()
+                correct_answer = (
+                    db.query(Answer)
+                    .filter(
+                        Answer.question_id == response.question_id,
+                        Answer.is_correct == True
+                    )
+                    .first()
+                )
                 
                 result.append({
                     "user_name": response.participation.user.name,
                     "user_uni": response.participation.user.uni,
                     "question_id": response.question_id,
                     "question_order": response.question.question_order,
-                    "question_text": response.question.question_text[:100] + "..." if len(response.question.question_text) > 100 else response.question.question_text,
+                    "question_text": (
+                        response.question.question_text[:100] + "..."
+                        if len(response.question.question_text) > 100
+                        else response.question.question_text
+                    ),
                     "answer_text": response.answer.answer_text if response.answer else "No answer",
                     "correct_answer_text": correct_answer.answer_text if correct_answer else "N/A",
                     "is_correct": response.is_correct,
@@ -1096,7 +1104,6 @@ def get_quiz_responses(quiz_id: int, db: Session = Depends(get_db)):
     except Exception as e:
         logger.error(f"Error in get_quiz_responses: {e}")
         raise HTTPException(status_code=500, detail="Error al obtener respuestas del quiz")
-
 # Bulk operations
 @app.post("/api/quizzes/bulk-toggle")
 def bulk_toggle_quizzes(quiz_ids: List[int], is_active: bool, db: Session = Depends(get_db)):
