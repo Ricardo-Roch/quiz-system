@@ -436,22 +436,8 @@ def get_quizzes(active_only: bool = False, db: Session = Depends(get_db)):
         
         quizzes = query.order_by(Quiz.created_at.desc()).all()
         
-        # Construir la respuesta manualmente para evitar problemas de serialización
-        result = []
-        for quiz in quizzes:
-            quiz_data = {
-                "id": quiz.id,
-                "title": quiz.title,
-                "area": quiz.area,
-                "description": quiz.description,
-                "is_active": quiz.is_active,
-                "created_at": quiz.created_at,
-                "questions_count": len(quiz.questions) if quiz.questions else 0
-            }
-            result.append(quiz_data)
-        
-        return result
-        
+        return quizzes   # ← ya coincide con QuizOut
+    
     except Exception as e:
         logger.error(f"Error in get_quizzes: {e}")
         return []
