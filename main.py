@@ -141,6 +141,17 @@ class QuizUpdate(BaseModel):
     description: Optional[str] = None
     is_active: Optional[bool] = None
 
+class QuizOut(BaseModel):  # ← ESTA ES LA CLASE FALTANTE
+    id: int
+    title: str
+    area: str
+    description: Optional[str] = None
+    is_active: bool
+    created_at: Optional[datetime] = None
+    
+    class Config:
+        from_attributes = True
+
 class QuestionType(str, Enum):
     MULTIPLE_CHOICE = "multiple_choice"
     OPEN_ENDED = "open_ended"
