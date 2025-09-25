@@ -464,45 +464,38 @@ def get_quizzes_count(db: Session = Depends(get_db)):
         logger.error(f"Database error: {e}")
         return {"total_count": 0, "active_count": 0, "inactive_count": 0, "error": str(e)}
 
-@app.get("/api/quizzes/{quiz_id}", response_model=QuizDetailOut)
+@app.get("/api/quizzes/{quiz_id}")
 def get_quiz(quiz_id: int, db: Session = Depends(get_db)):
-    try:
-        quiz = db.query(Quiz).filter(Quiz.id == quiz_id).first()
-        if not quiz:
-            raise HTTPException(status_code=404, detail="Quiz no encontrado")
-        
-        # Eager load questions and answers
-        questions = []
-        for q in sorted(quiz.questions, key=lambda x: x.question_order):
-            answers = []
-            for a in sorted(q.answers, key=lambda x: x.answer_order):
-                answers.append({
-                    "id": a.id, 
-                    "answer_text": a.answer_text, 
-                    "answer_order": a.answer_order,
-                    "is_correct": a.is_correct  # Include for admin
-                })
-            questions.append({
+    quiz = db.query(Quiz).filter(Quiz.id == quiz_id).first()
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz no encontrado")
+
+    return {
+        "id": quiz.id,
+        "title": quiz.title,
+        "description": quiz.description,
+        "area": quiz.area,
+        "questions": [
+            {
                 "id": q.id,
                 "question_text": q.question_text,
                 "question_order": q.question_order,
                 "time_limit": q.time_limit,
-                "answers": answers
-            })
-        
-        return {
-            "id": quiz.id,
-            "title": quiz.title,
-            "area": quiz.area,
-            "description": quiz.description,
-            "is_active": quiz.is_active,
-            "questions": questions
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error fetching quiz: {e}")
-        raise HTTPException(status_code=500, detail="Error al obtener quiz")
+                "question_type": q.question_type,
+                "answers": [
+                    {
+                        "id": a.id,
+                        "answer_text": a.answer_text,
+                        "image_url": a.image_url,
+                        "is_correct": a.is_correct  # ⚠️ cuidado, en producción no mandes esto al front del alumno
+                    }
+                    for a in q.answers
+                ]
+            }
+            for q in quiz.questions
+        ]
+    }
+
 
 @app.put("/api/quizzes/{quiz_id}", response_model=QuizOut)
 def update_quiz(quiz_id: int, quiz_update: QuizUpdate, db: Session = Depends(get_db)):
@@ -803,7 +796,6 @@ def submit_answer(participation_id: int, answer: SubmitAnswer, db: Session = Dep
     if not question:
         raise HTTPException(status_code=404, detail="Pregunta no encontrada")
 
-    # Revisar si ya fue contestada
     existing_response = db.query(UserResponse).filter(
         UserResponse.participation_id == participation_id,
         UserResponse.question_id == answer.question_id
@@ -813,25 +805,27 @@ def submit_answer(participation_id: int, answer: SubmitAnswer, db: Session = Dep
 
     is_correct = False
 
-    if question.question_type == "choice" or question.question_type == "image":
-        # --- opciones seleccionables ---
+    if question.question_type in ["choice", "image"]:
         correct_answers = db.query(Answer).filter(
             Answer.question_id == question.id,
             Answer.is_correct == True
         ).all()
         correct_ids = {a.id for a in correct_answers}
-        is_correct = answer.answer_id in correct_ids
+        submitted_ids = set(answer.answers or [])
 
-        user_response = UserResponse(
-            participation_id=participation_id,
-            question_id=answer.question_id,
-            answer_id=answer.answer_id,
-            response_time=answer.response_time,
-            is_correct=is_correct
-        )
+        # ✅ correcto si coincide exactamente (todas correctas, ninguna incorrecta)
+        is_correct = submitted_ids == correct_ids
+
+        for aid in submitted_ids:
+            db.add(UserResponse(
+                participation_id=participation_id,
+                question_id=answer.question_id,
+                answer_id=aid,
+                response_time=answer.response_time,
+                is_correct=is_correct
+            ))
 
     elif question.question_type == "open":
-        # --- respuesta de texto ---
         correct_answers = db.query(Answer).filter(
             Answer.question_id == question.id,
             Answer.is_correct == True
@@ -839,24 +833,21 @@ def submit_answer(participation_id: int, answer: SubmitAnswer, db: Session = Dep
         valid_texts = {a.answer_text.lower().strip() for a in correct_answers}
         is_correct = answer.text_response and answer.text_response.lower().strip() in valid_texts
 
-        user_response = UserResponse(
+        db.add(UserResponse(
             participation_id=participation_id,
             question_id=answer.question_id,
             text_response=answer.text_response,
             response_time=answer.response_time,
             is_correct=is_correct
-        )
+        ))
 
     else:
         raise HTTPException(status_code=400, detail="Tipo de pregunta no soportado")
-
-    db.add(user_response)
 
     if is_correct:
         participation.score += 1
 
     db.commit()
-
     return {"correct": is_correct, "current_score": participation.score}
 
 
@@ -1208,6 +1199,32 @@ def get_quiz_statistics(quiz_id: int, db: Session = Depends(get_db)):
     except Exception as e:
         logger.error(f"Error getting quiz statistics: {e}")
         raise HTTPException(status_code=500, detail="Error al obtener estadísticas del quiz")
+
+@app.get("/api/quizzes/{quiz_id}/questions")
+def list_questions(quiz_id: int, db: Session = Depends(get_db)):
+    quiz = db.query(Quiz).filter(Quiz.id == quiz_id).first()
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz no encontrado")
+
+    return [
+        {
+            "id": q.id,
+            "question_text": q.question_text,
+            "question_order": q.question_order,
+            "time_limit": q.time_limit,
+            "question_type": q.question_type,
+            "answers": [
+                {
+                    "id": a.id,
+                    "answer_text": a.answer_text,
+                    "image_url": a.image_url,
+                    "is_correct": a.is_correct
+                }
+                for a in q.answers
+            ]
+        }
+        for q in quiz.questions
+    ]
 
 # Enhanced responses endpoint
 # Obtener todas las respuestas de un quiz (versión correcta)

@@ -686,34 +686,33 @@
 
 function showQuestion() {
   clearTimer();
-  
+
   if (currentQuestionIndex >= questions.length) {
     endQuiz();
     return;
   }
 
   const question = questions[currentQuestionIndex];
-  
+
   qIndex.textContent = currentQuestionIndex + 1;
   questionText.textContent = question.question_text;
-answers.innerHTML = "";
-question.answers.forEach((ans, index) => {
-  const btn = document.createElement("button");
-  btn.classList.add("answer");
-  btn.textContent = ans.answer_text;
+  answers.innerHTML = "";
 
-  // Guardar la data real del answer en cada botón
-  btn.answerData = ans;
+  question.answers.forEach((ans, index) => {
+    const btn = document.createElement("button");
+    btn.classList.add("answer");
+    btn.textContent = ans.answer_text;
+    btn.answerData = ans;
 
-  btn.onclick = () => selectAnswer(ans, index, btn);
-  answers.appendChild(btn);
-});
+    btn.onclick = () => btn.classList.toggle("selected");
+    answers.appendChild(btn);
+  });
 
-  // Iniciar timer
   timeLeft = question.time_limit || TIME_PER_QUESTION;
   updateTimer();
   timer = setInterval(tick, 100);
 }
+
 
 // También actualizar la función timeoutAnswer para mantener consistencia
 function timeoutAnswer() {
@@ -768,88 +767,51 @@ function timeoutAnswer() {
     }
 
 
-async function selectAnswer(selectedAnswer, answerIndex, buttonEl) {
+async function selectAnswer() {
   clearTimer();
-  
-  // PREVENIR MÚLTIPLES CLICS - Deshabilitar todos los botones inmediatamente
-  const allAnswerButtons = answers.querySelectorAll('.answer');
-  allAnswerButtons.forEach(btn => {
-    btn.disabled = true;
-    btn.style.pointerEvents = 'none';
-    btn.onclick = null; // Remover completamente los event handlers
-  });
-  
+
+  const selectedButtons = answers.querySelectorAll(".answer.selected");
+  if (selectedButtons.length === 0) return; // nada seleccionado
+
   const question = questions[currentQuestionIndex];
+  const selectedAnswers = Array.from(selectedButtons).map(btn => btn.answerData);
+
   const responseTime = Math.round(((question.time_limit || TIME_PER_QUESTION) - timeLeft) * 1000);
 
-  console.log('Respuesta seleccionada:', {
-    questionId: question.id,
-    selectedAnswer: selectedAnswer,
-    answerId: selectedAnswer.id,
-    answerText: selectedAnswer.answer_text
-  });
-
   try {
-    // Enviar respuesta al servidor
     const response = await fetch(`${API_BASE_URL}/api/participate/${participationId}/submit`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         question_id: question.id,
-        answer_id: selectedAnswer.id,
+        answers: selectedAnswers.map(a => a.id), // enviar array de IDs
         response_time: responseTime
       })
     });
 
-    if (response.ok) {
-      const result = await response.json();
-      
-      console.log('Resultado de la API:', result);
-      
-      // SOLO marcar la respuesta seleccionada - SIN información adicional
-allAnswerButtons.forEach((btn) => {
-  const btnAnswer = btn.answerData;
+    const result = await response.json();
 
-  if (btnAnswer && btnAnswer.id === selectedAnswer.id) {
-    if (result.correct) {
-      btn.classList.add("correct");
-    } else {
-      btn.classList.add("wrong");
-    }
-  }
-});
-
-      // Actualizar score si es correcto
-      if (result.correct) {
-        score++;
+    // marcar visualmente correctas / incorrectas
+    answers.querySelectorAll(".answer").forEach(btn => {
+      if (btn.answerData.is_correct) {
+        btn.classList.add("correct");
+      } else if (btn.classList.contains("selected")) {
+        btn.classList.add("wrong");
       }
+      btn.disabled = true;
+    });
 
-      // Avanzar a la siguiente pregunta después de 2 segundos
-      setTimeout(() => {
-        currentQuestionIndex++;
-        showQuestion();
-      }, 2000);
-      
-    } else {
-      const errorData = await response.json();
-      console.error('Error de API:', errorData);
-      
-      // En caso de error, continuar con la siguiente pregunta
-      setTimeout(() => {
-        currentQuestionIndex++;
-        showQuestion();
-      }, 1500);
+    if (result.is_correct) {
+      score++;
     }
-  } catch (error) {
-    console.error('Error enviando respuesta:', error);
-    
-    // En caso de error de red, continuar con la siguiente pregunta
+
     setTimeout(() => {
       currentQuestionIndex++;
       showQuestion();
     }, 1500);
+
+  } catch (error) {
+    console.error("Error enviando respuesta:", error);
   }
 }
 
