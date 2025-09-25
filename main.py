@@ -175,7 +175,7 @@ class QuizOut(BaseModel):
     area: str
     description: Optional[str]
     is_active: bool
-    created_at: datetime
+    created_at: Optional[datetime] = None   # <-- ahora acepta null
     
     class Config:
         from_attributes = True
