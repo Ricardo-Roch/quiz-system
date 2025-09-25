@@ -275,18 +275,7 @@ def get_db():
     finally:
         db.close()
 
-# Helper functions
-def safe_db_operation(operation):
-    """Decorator para operaciones seguras de base de datos"""
-    def decorator(func):
-        async def wrapper(*args, **kwargs):
-            try:
-                return await func(*args, **kwargs) if asyncio.iscoroutinefunction(func) else func(*args, **kwargs)
-            except Exception as e:
-                logger.error(f"Database operation failed in {func.__name__}: {e}")
-                raise HTTPException(status_code=500, detail="Error interno del servidor")
-        return wrapper
-    return decorator
+
 
 # Health check endpoints
 @app.get("/api/health")
@@ -516,20 +505,37 @@ def get_quiz(quiz_id: int, db: Session = Depends(get_db)):
         if not quiz:
             raise HTTPException(status_code=404, detail="Quiz no encontrado")
         
-        # Eager load questions and answers
+        # FUNCIÓN HELPER PARA LIMPIAR TEXTO
+        def clean_text(text):
+            if not text:
+                return text
+            # Escapar caracteres problemáticos
+            return (text
+                .replace('\n', '\\n')
+                .replace('\r', '\\r')
+                .replace('\t', '\\t')
+                .replace('"', '\\"')
+                .replace('\b', '\\b')
+                .replace('\f', '\\f')
+                .strip())
+        
+        # Eager load questions and answers con limpieza de texto
         questions = []
         for q in sorted(quiz.questions, key=lambda x: x.question_order):
             answers = []
             for a in sorted(q.answers, key=lambda x: x.answer_order):
                 answers.append({
                     "id": a.id, 
-                    "answer_text": a.answer_text, 
+                    "answer_text": clean_text(a.answer_text), 
+                    "image_url": a.image_url,
                     "answer_order": a.answer_order,
                     "is_correct": a.is_correct
                 })
             questions.append({
                 "id": q.id,
-                "question_text": q.question_text,
+                "question_text": clean_text(q.question_text),
+                "question_type": q.question_type or "multiple_choice",
+                "image_url": q.image_url,
                 "question_order": q.question_order,
                 "time_limit": q.time_limit,
                 "answers": answers
@@ -537,9 +543,9 @@ def get_quiz(quiz_id: int, db: Session = Depends(get_db)):
         
         return {
             "id": quiz.id,
-            "title": quiz.title,
-            "area": quiz.area,
-            "description": quiz.description,
+            "title": clean_text(quiz.title),
+            "area": clean_text(quiz.area),
+            "description": clean_text(quiz.description),
             "is_active": quiz.is_active,
             "questions": questions
         }
@@ -1111,52 +1117,6 @@ def debug_participations(db: Session = Depends(get_db)):
     except Exception as e:
         return {"error": str(e)}
 
-@app.get("/api/quizzes/{quiz_id}/responses")
-def get_quiz_responses(quiz_id: int, db: Session = Depends(get_db)):
-    try:
-        responses = (
-            db.query(
-                UserResponse.id,
-                UserResponse.is_correct,
-                UserResponse.response_time,
-                UserResponse.answered_at,
-                Question.question_order,
-                Question.question_text,
-                Answer.answer_text,
-                User.name.label("user_name"),
-                User.uni.label("user_uni"),
-                Participation.completed_at,
-                Participation.id.label("participation_id")
-            )
-            .join(Participation, UserResponse.participation_id == Participation.id)
-            .join(User, Participation.user_id == User.id)
-            .outerjoin(Question, UserResponse.question_id == Question.id)
-            .outerjoin(Answer, UserResponse.answer_id == Answer.id)
-            .filter(Participation.quiz_id == quiz_id)
-            .all()
-        )
-
-        result = []
-        for r in responses:
-            result.append({
-                "participation_id": r.participation_id,
-                "user_name": r.user_name,
-                "user_uni": r.user_uni,
-                "question_order": r.question_order,
-                "question_text": r.question_text,
-                "answer_text": r.answer_text,
-                "is_correct": r.is_correct,
-                "response_time": r.response_time,
-                "answered_at": r.answered_at,
-                "completed_at": r.completed_at,
-            })
-        
-        return result
-
-    except Exception as e:
-        logger.error(f"Error fetching quiz responses: {e}")
-        raise HTTPException(status_code=500, detail="Error al obtener respuestas del quiz")
-
 
 @app.delete("/api/participations/{participation_id}")
 def delete_participation(participation_id: int, db: Session = Depends(get_db)):
@@ -1284,56 +1244,69 @@ def get_quiz_responses(quiz_id: int, db: Session = Depends(get_db)):
         if not quiz:
             raise HTTPException(status_code=404, detail="Quiz no encontrado")
         
-        # Obtener todas las respuestas asociadas al quiz
+        # Función para limpiar texto
+        def clean_text(text):
+            if not text:
+                return "N/A"
+            return str(text).replace('\n', ' ').replace('\r', ' ').replace('\t', ' ').strip()
+        
+        # Obtener respuestas con LEFT JOIN para evitar errores
         responses = (
-            db.query(UserResponse)
-            .join(Participation)
-            .join(User)
-            .join(Question)
-            .join(Answer)
+            db.query(
+                UserResponse.id,
+                UserResponse.is_correct,
+                UserResponse.response_time,
+                UserResponse.answered_at,
+                UserResponse.open_answer_text,
+                Question.question_order,
+                Question.question_text,
+                Question.question_type,
+                Answer.answer_text,
+                User.name.label("user_name"),
+                User.uni.label("user_uni"),
+                Participation.completed_at,
+                Participation.id.label("participation_id")
+            )
+            .join(Participation, UserResponse.participation_id == Participation.id)
+            .join(User, Participation.user_id == User.id)
+            .join(Question, UserResponse.question_id == Question.id)
+            .outerjoin(Answer, UserResponse.answer_id == Answer.id)  # LEFT JOIN
             .filter(Participation.quiz_id == quiz_id)
             .all()
         )
-        
+
         result = []
-        for response in responses:
-            try:
-                correct_answer = (
-                    db.query(Answer)
-                    .filter(
-                        Answer.question_id == response.question_id,
-                        Answer.is_correct == True
-                    )
-                    .first()
-                )
-                
-                result.append({
-                    "user_name": response.participation.user.name,
-                    "user_uni": response.participation.user.uni,
-                    "question_id": response.question_id,
-                    "question_order": response.question.question_order,
-                    "question_text": (
-                        response.question.question_text[:100] + "..."
-                        if len(response.question.question_text) > 100
-                        else response.question.question_text
-                    ),
-                    "answer_text": response.answer.answer_text if response.answer else "No answer",
-                    "correct_answer_text": correct_answer.answer_text if correct_answer else "N/A",
-                    "is_correct": response.is_correct,
-                    "response_time": response.response_time,
-                    "answered_at": response.answered_at
-                })
-            except AttributeError as e:
-                logger.warning(f"Error processing response {response.id}: {e}")
-                continue
+        for r in responses:
+            # Manejar respuestas abiertas y de opción múltiple
+            answer_text = "N/A"
+            if r.open_answer_text:
+                answer_text = clean_text(r.open_answer_text)
+            elif r.answer_text:
+                answer_text = clean_text(r.answer_text)
+            
+            result.append({
+                "participation_id": r.participation_id,
+                "user_name": clean_text(r.user_name) if r.user_name else "Usuario Eliminado",
+                "user_uni": clean_text(r.user_uni) if r.user_uni else "N/A",
+                "question_order": r.question_order or 0,
+                "question_text": clean_text(r.question_text) if r.question_text else "Pregunta eliminada",
+                "question_type": r.question_type or "multiple_choice",
+                "answer_text": answer_text,
+                "is_correct": bool(r.is_correct),
+                "response_time": r.response_time or 0,
+                "answered_at": r.answered_at,
+                "completed_at": r.completed_at,
+            })
         
         return result
-        
+
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error in get_quiz_responses: {e}")
-        raise HTTPException(status_code=500, detail="Error al obtener respuestas del quiz")
+        logger.error(f"Error fetching quiz responses: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error al obtener respuestas: {str(e)}")
 # Bulk operations
 @app.post("/api/quizzes/bulk-toggle")
 def bulk_toggle_quizzes(quiz_ids: List[int], is_active: bool, db: Session = Depends(get_db)):
