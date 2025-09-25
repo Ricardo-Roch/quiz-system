@@ -644,6 +644,81 @@
         width: calc(100% - 32px);
       }
     }
+
+        /* Agregar al CSS existente */
+    .open-answer-input {
+    width: 100%;
+    min-height: 100px;
+    padding: 16px;
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    font-size: 16px;
+    resize: vertical;
+    transition: all 0.3s ease;
+    }
+
+    .open-answer-input:focus {
+    outline: none;
+    border-color: var(--primary-blue);
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
+    }
+
+    .image-answer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    }
+
+    .image-answer img {
+    max-width: 150px;
+    max-height: 150px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 2px solid transparent;
+    transition: all 0.3s ease;
+    }
+
+    .image-answer:hover img {
+    border-color: var(--primary-blue);
+    }
+
+    .image-answer.correct img {
+    border-color: var(--success);
+    }
+
+    .image-answer.wrong img {
+    border-color: var(--primary-red);
+    }
+
+    .question-image {
+    max-width: 100%;
+    max-height: 300px;
+    object-fit: contain;
+    border-radius: 8px;
+    margin: 16px 0;
+    }
+
+    .submit-open-answer {
+    margin-top: 20px;
+    padding: 12px 24px;
+    background: var(--primary-blue);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    }
+
+    .submit-open-answer:hover {
+    background: #2563eb;
+    }
+
+    .submit-open-answer:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    }
   </style>
 </head>
 <body>
@@ -877,6 +952,21 @@
         <div class="form-group">
           <label class="form-label">Tiempo límite (segundos)</label>
           <input type="number" id="questionTimeLimit" class="form-input" min="10" value="30" required>
+        </div>
+                <!-- En el modal questionModal, agregar campos para tipo y imagen -->
+        <div class="form-group">
+        <label class="form-label">Tipo de Pregunta</label>
+        <select id="questionType" class="form-select">
+            <option value="multiple_choice">Opción Múltiple</option>
+            <option value="open_ended">Respuesta Abierta</option>
+            <option value="image_choice">Selección de Imagen</option>
+        </select>
+        </div>
+
+        <div class="form-group" id="questionImageGroup" style="display:none;">
+        <label class="form-label">Imagen de la Pregunta</label>
+        <input type="file" id="questionImageFile" class="form-input" accept="image/*">
+        <div id="questionImagePreview" style="margin-top: 10px;"></div>
         </div>
         
         <h4>Respuestas</h4>
@@ -1775,10 +1865,50 @@ function openQuestionModal(question = null) {
   
   modal.classList.add('show');
 }
+//de aquii ------------------------------------------------------------------------------------------------------------------------------------
+/*function removeAnswerField(button) {
+  if (document.querySelectorAll('.answer-text').length > 2) {
+    button.parentElement.remove();
+  } else {
+    alert('Debe haber al menos 2 respuestas');
+  }
+}*/
+// Agregar event listener para cambio de tipo
+document.getElementById('questionType').addEventListener('change', handleQuestionTypeChange);
 
-function addAnswerField(text = '', isCorrect = false) {
+function handleQuestionTypeChange() {
+  const questionType = document.getElementById('questionType').value;
+  const imageGroup = document.getElementById('questionImageGroup');
+  const answersContainer = document.getElementById('answersContainer');
+  
+  // Mostrar/ocultar campo de imagen
+  if (questionType === 'image_choice') {
+    imageGroup.style.display = 'block';
+  } else {
+    imageGroup.style.display = 'none';
+  }
+  
+  // Limpiar respuestas y recrear según tipo
+  answersContainer.innerHTML = '';
+  answerCount = 0;
+  
+  if (questionType === 'open_ended') {
+    // Para preguntas abiertas, agregar un campo de referencia
+    addAnswerField('Respuesta de referencia (opcional)', false, true);
+    document.querySelector('input[name="correctAnswer"]').style.display = 'none';
+  } else {
+    // Para otros tipos, comportamiento normal
+    for (let i = 0; i < 4; i++) {
+      addAnswerField();
+    }
+  }
+}
+
+// Modificar función addAnswerField
+function addAnswerField(text = '', isCorrect = false, isReference = false) {
   answerCount++;
   const container = document.getElementById('answersContainer');
+  const questionType = document.getElementById('questionType').value;
   
   const answerDiv = document.createElement('div');
   answerDiv.className = 'form-group';
@@ -1787,64 +1917,141 @@ function addAnswerField(text = '', isCorrect = false) {
   answerDiv.style.alignItems = 'center';
   answerDiv.dataset.answerIndex = answerCount;
   
-  answerDiv.innerHTML = `
-    <input type="text" class="form-input answer-text" placeholder="Respuesta ${answerCount}" value="${text}" required>
+  let inputField = '';
+  if (questionType === 'image_choice') {
+    inputField = `
+      <input type="file" class="form-input answer-image" accept="image/*">
+      <input type="text" class="form-input answer-text" placeholder="Descripción (opcional)" value="${text}">
+    `;
+  } else {
+    inputField = `<input type="text" class="form-input answer-text" placeholder="Respuesta ${answerCount}" value="${text}" required>`;
+  }
+  
+  const correctRadio = isReference ? '' : `
     <label style="display: flex; align-items: center; gap: 4px; white-space: nowrap;">
       <input type="radio" name="correctAnswer" value="${answerCount}" ${isCorrect ? 'checked' : ''}>
       Correcta
     </label>
+  `;
+  
+  const removeButton = isReference ? '' : `
     <button type="button" class="btn btn-danger btn-small" onclick="removeAnswerField(this)">×</button>
   `;
   
+  answerDiv.innerHTML = inputField + correctRadio + removeButton;
   container.appendChild(answerDiv);
 }
 
-function removeAnswerField(button) {
-  if (document.querySelectorAll('.answer-text').length > 2) {
-    button.parentElement.remove();
-  } else {
-    alert('Debe haber al menos 2 respuestas');
+// Función para subir imagen
+async function uploadImage(fileInput) {
+  const file = fileInput.files[0];
+  if (!file) return null;
+  
+  const formData = new FormData();
+  formData.append('file', file);
+  
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/upload-image`, {
+      method: 'POST',
+      body: formData
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      return data.image_url;
+    } else {
+      throw new Error('Error al subir imagen');
+    }
+  } catch (error) {
+    console.error('Error uploading image:', error);
+    alert('Error al subir imagen');
+    return null;
   }
 }
 
+// Modificar handleQuestionSubmit
 async function handleQuestionSubmit(e) {
   e.preventDefault();
   
   const questionId = document.getElementById('questionId').value;
-  const answerTexts = Array.from(document.querySelectorAll('.answer-text')).map(input => input.value);
-  const correctAnswerRadio = document.querySelector('input[name="correctAnswer"]:checked');
+  const questionType = document.getElementById('questionType').value;
   
-  if (!correctAnswerRadio || answerTexts.some(text => !text.trim())) {
-    alert('Por favor completa todos los campos y marca una respuesta correcta');
-    return;
+  // Subir imagen de pregunta si existe
+  let questionImageUrl = null;
+  const questionImageFile = document.getElementById('questionImageFile');
+  if (questionImageFile && questionImageFile.files[0]) {
+    questionImageUrl = await uploadImage(questionImageFile);
   }
   
-  const correctAnswerIndex = parseInt(correctAnswerRadio.value);
+  // Procesar respuestas según tipo
+  const answers = [];
+  const answerDivs = document.querySelectorAll('[data-answer-index]');
   
-  const answers = answerTexts.map((text, index) => ({
-    answer_text: text,
-    is_correct: (index + 1) === correctAnswerIndex,
-    answer_order: index + 1
-  }));
+  for (let i = 0; i < answerDivs.length; i++) {
+    const div = answerDivs[i];
+    const answerIndex = parseInt(div.dataset.answerIndex);
+    
+    let answerText = null;
+    let imageUrl = null;
+    let isCorrect = false;
+    
+    if (questionType === 'image_choice') {
+      const imageInput = div.querySelector('.answer-image');
+      const textInput = div.querySelector('.answer-text');
+      
+      if (imageInput && imageInput.files[0]) {
+        imageUrl = await uploadImage(imageInput);
+      }
+      answerText = textInput ? textInput.value : null;
+      
+      const correctRadio = div.querySelector(`input[name="correctAnswer"][value="${answerIndex}"]`);
+      isCorrect = correctRadio ? correctRadio.checked : false;
+    } else {
+      const textInput = div.querySelector('.answer-text');
+      answerText = textInput ? textInput.value : null;
+      
+      if (questionType !== 'open_ended') {
+        const correctRadio = div.querySelector(`input[name="correctAnswer"][value="${answerIndex}"]`);
+        isCorrect = correctRadio ? correctRadio.checked : false;
+      }
+    }
+    
+    answers.push({
+      answer_text: answerText,
+      image_url: imageUrl,
+      is_correct: isCorrect,
+      answer_order: i + 1
+    });
+  }
+  
+  // Validaciones
+  if (questionType !== 'open_ended') {
+    const hasCorrect = answers.some(a => a.is_correct);
+    if (!hasCorrect) {
+      alert('Debe marcar al menos una respuesta como correcta');
+      return;
+    }
+  }
   
   const questionData = {
     question_text: document.getElementById('questionText').value,
+    question_type: questionType,
+    image_url: questionImageUrl,
     question_order: parseInt(document.getElementById('questionOrder').value),
     time_limit: parseInt(document.getElementById('questionTimeLimit').value),
     answers: answers
   };
   
+  // Enviar datos (resto igual que antes)
   try {
     let response;
     if (questionId) {
-      // Update existing question
       response = await fetch(`${API_BASE_URL}/api/questions/${questionId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(questionData)
       });
     } else {
-      // Create new question
       response = await fetch(`${API_BASE_URL}/api/quizzes/${currentQuizId}/questions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1866,6 +2073,10 @@ async function handleQuestionSubmit(e) {
   }
 }
 
+
+
+
+//de aquii ------------------------------------------------------------------------------------------------------------------------------------
 // Utility Functions
 function closeModal(modalId) {
   document.getElementById(modalId).classList.remove('show');

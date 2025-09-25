@@ -13,6 +13,7 @@ import base64
 from typing import List, Optional
 import os
 import logging
+from enum import Enum
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -53,24 +54,29 @@ class Quiz(Base):
     questions = relationship("Question", back_populates="quiz", cascade="all, delete-orphan")
     participations = relationship("Participation", back_populates="quiz", cascade="all, delete-orphan")
 
+# Agregar nueva columna para tipo de pregunta
 class Question(Base):
     __tablename__ = "questions"
     
     id = Column(Integer, primary_key=True, index=True)
     quiz_id = Column(Integer, ForeignKey("quizzes.id", ondelete="CASCADE"))
     question_text = Column(Text, nullable=False)
+    question_type = Column(String(20), default="multiple_choice")  # NUEVO: 'multiple_choice', 'open_ended', 'image_choice'
+    image_url = Column(String(500), nullable=True)  # NUEVO: Para preguntas con imagen
     question_order = Column(Integer, nullable=False)
     time_limit = Column(Integer, default=30)
     
     quiz = relationship("Quiz", back_populates="questions")
     answers = relationship("Answer", back_populates="question", cascade="all, delete-orphan")
 
+# Agregar columnas para imágenes y respuestas abiertas
 class Answer(Base):
     __tablename__ = "answers"
     
     id = Column(Integer, primary_key=True, index=True)
     question_id = Column(Integer, ForeignKey("questions.id", ondelete="CASCADE"))
-    answer_text = Column(String(500), nullable=False)
+    answer_text = Column(String(500), nullable=True)  # MODIFICADO: Ahora nullable
+    image_url = Column(String(500), nullable=True)  # NUEVO: Para respuestas con imagen
     is_correct = Column(Boolean, default=False)
     answer_order = Column(Integer, nullable=False)
     
@@ -92,13 +98,15 @@ class Participation(Base):
     quiz = relationship("Quiz", back_populates="participations")
     responses = relationship("UserResponse", back_populates="participation", cascade="all, delete-orphan")
 
+# Agregar columna para respuestas abiertas
 class UserResponse(Base):
     __tablename__ = "user_responses"
     
     id = Column(Integer, primary_key=True, index=True)
     participation_id = Column(Integer, ForeignKey("participations.id", ondelete="CASCADE"))
     question_id = Column(Integer, ForeignKey("questions.id", ondelete="CASCADE"))
-    answer_id = Column(Integer, ForeignKey("answers.id", ondelete="CASCADE"))
+    answer_id = Column(Integer, ForeignKey("answers.id", ondelete="CASCADE"), nullable=True)  # MODIFICADO: Ahora nullable
+    open_answer_text = Column(Text, nullable=True)  # NUEVO: Para respuestas abiertas
     response_time = Column(Integer)
     is_correct = Column(Boolean, default=False)
     answered_at = Column(DateTime, default=datetime.utcnow)
@@ -133,28 +141,39 @@ class QuizUpdate(BaseModel):
     description: Optional[str] = None
     is_active: Optional[bool] = None
 
+class QuestionType(str, Enum):
+    MULTIPLE_CHOICE = "multiple_choice"
+    OPEN_ENDED = "open_ended"
+    IMAGE_CHOICE = "image_choice"
+
 class AnswerCreate(BaseModel):
-    answer_text: str = Field(..., min_length=1, max_length=500)
-    is_correct: bool
+    answer_text: Optional[str] = None
+    image_url: Optional[str] = None
+    is_correct: bool = False
     answer_order: int = Field(..., ge=1)
 
 class QuestionCreate(BaseModel):
     question_text: str = Field(..., min_length=1)
+    question_type: QuestionType = QuestionType.MULTIPLE_CHOICE
+    image_url: Optional[str] = None
     question_order: int = Field(..., ge=1)
     time_limit: int = Field(30, ge=10, le=300)
-    answers: List[AnswerCreate] = Field(..., min_items=2)
+    answers: List[AnswerCreate] = Field(..., min_items=1)  # MODIFICADO: min 1 en lugar de 2
 
 class QuestionUpdate(BaseModel):
     question_text: Optional[str] = Field(None, min_length=1)
+    question_type: Optional[QuestionType] = None
+    image_url: Optional[str] = None
     question_order: Optional[int] = Field(None, ge=1)
     time_limit: Optional[int] = Field(None, ge=10, le=300)
-    answers: Optional[List[AnswerCreate]] = Field(None, min_items=2)
+    answers: Optional[List[AnswerCreate]] = Field(None, min_items=1)
 
 class AnswerOut(BaseModel):
     id: int
-    answer_text: str
+    answer_text: Optional[str] = None
+    image_url: Optional[str] = None
     answer_order: int
-    is_correct: Optional[bool] = None  # Solo para admin
+    is_correct: Optional[bool] = None
     
     class Config:
         from_attributes = True
@@ -162,6 +181,8 @@ class AnswerOut(BaseModel):
 class QuestionOut(BaseModel):
     id: int
     question_text: str
+    question_type: str
+    image_url: Optional[str] = None
     question_order: int
     time_limit: int
     answers: List[AnswerOut]
@@ -169,31 +190,10 @@ class QuestionOut(BaseModel):
     class Config:
         from_attributes = True
 
-class QuizOut(BaseModel):
-    id: int
-    title: str
-    area: str
-    description: Optional[str]
-    is_active: bool
-    created_at: Optional[datetime] = None   # <-- ahora acepta null
-    
-    class Config:
-        from_attributes = True
-
-class QuizDetailOut(BaseModel):
-    id: int
-    title: str
-    area: str
-    description: Optional[str]
-    is_active: bool
-    questions: List[QuestionOut]
-    
-    class Config:
-        from_attributes = True
-
 class SubmitAnswer(BaseModel):
     question_id: int
-    answer_id: int
+    answer_id: Optional[int] = None  # MODIFICADO: Ahora opcional
+    open_answer_text: Optional[str] = None  # NUEVO: Para respuestas abiertas
     response_time: int = Field(..., ge=0)
 
 class ParticipationOut(BaseModel):
@@ -412,6 +412,7 @@ def get_user_participations(uni: str, db: Session = Depends(get_db)):
         logger.error(f"Error fetching user participations: {e}")
         raise HTTPException(status_code=500, detail="Error al obtener participaciones")
 
+
 # Quiz endpoints
 @app.post("/api/quizzes/", response_model=QuizOut)
 def create_quiz(quiz: QuizCreate, db: Session = Depends(get_db)):
@@ -427,6 +428,34 @@ def create_quiz(quiz: QuizCreate, db: Session = Depends(get_db)):
         logger.error(f"Error creating quiz: {e}")
         raise HTTPException(status_code=500, detail="Error al crear quiz")
 
+@app.post("/api/upload-image")
+async def upload_image(file: UploadFile = File(...)):
+    try:
+        # Validar tipo de archivo
+        if not file.content_type.startswith('image/'):
+            raise HTTPException(status_code=400, detail="Solo se permiten archivos de imagen")
+        
+        # Crear directorio si no existe
+        upload_dir = "static/images"
+        os.makedirs(upload_dir, exist_ok=True)
+        
+        # Generar nombre único
+        file_extension = file.filename.split('.')[-1]
+        unique_filename = f"{int(datetime.utcnow().timestamp())}_{uuid.uuid4().hex[:8]}.{file_extension}"
+        file_path = os.path.join(upload_dir, unique_filename)
+        
+        # Guardar archivo
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        
+        # Retornar URL relativa
+        image_url = f"/static/images/{unique_filename}"
+        return {"image_url": image_url, "filename": unique_filename}
+        
+    except Exception as e:
+        logger.error(f"Error uploading image: {e}")
+        raise HTTPException(status_code=500, detail="Error al subir imagen")
+    
 @app.get("/api/quizzes/", response_model=List[QuizOut])
 def get_quizzes(active_only: bool = False, db: Session = Depends(get_db)):
     try:
@@ -542,32 +571,40 @@ def add_question(quiz_id: int, question: QuestionCreate, db: Session = Depends(g
         if not quiz:
             raise HTTPException(status_code=404, detail="Quiz no encontrado")
         
-        # Validar que haya al menos una respuesta correcta
-        correct_answers = [a for a in question.answers if a.is_correct]
-        if len(correct_answers) < 1:
-            raise HTTPException(status_code=400, detail="Debe haber al menos una respuesta correcta")
+        # Validaciones específicas por tipo
+        if question.question_type == QuestionType.MULTIPLE_CHOICE or question.question_type == QuestionType.IMAGE_CHOICE:
+            correct_answers = [a for a in question.answers if a.is_correct]
+            if len(correct_answers) < 1:
+                raise HTTPException(status_code=400, detail="Debe haber al menos una respuesta correcta")
+        elif question.question_type == QuestionType.OPEN_ENDED:
+            if len(question.answers) != 1:
+                raise HTTPException(status_code=400, detail="Las preguntas abiertas deben tener exactamente una 'respuesta' como referencia")
         
         db_question = Question(
             quiz_id=quiz_id,
             question_text=question.question_text,
+            question_type=question.question_type,
+            image_url=question.image_url,
             question_order=question.question_order,
             time_limit=question.time_limit
         )
         db.add(db_question)
-        db.flush()  # Obtener el ID
+        db.flush()
         
         # Agregar respuestas
         for answer in question.answers:
             db_answer = Answer(
                 question_id=db_question.id,
                 answer_text=answer.answer_text,
-                is_correct=answer.is_correct,
+                image_url=answer.image_url,
+                is_correct=answer.is_correct if question.question_type != QuestionType.OPEN_ENDED else False,
                 answer_order=answer.answer_order
             )
             db.add(db_answer)
         
         db.commit()
         return {"message": "Pregunta agregada exitosamente", "question_id": db_question.id}
+        
     except HTTPException:
         raise
     except Exception as e:
@@ -804,35 +841,49 @@ def submit_answer(participation_id: int, answer: SubmitAnswer, db: Session = Dep
         if existing_response:
             raise HTTPException(status_code=400, detail="Ya respondiste esta pregunta")
         
-        # Obtener TODAS las correctas
-        correct_answers = db.query(Answer).filter(
-            Answer.question_id == answer.question_id,
-            Answer.is_correct == True
-        ).all()
-        
-        if not correct_answers:
+        # Obtener la pregunta
+        question = db.query(Question).filter(Question.id == answer.question_id).first()
+        if not question:
             raise HTTPException(status_code=400, detail="Pregunta no válida")
         
-        correct_answer_ids = {a.id for a in correct_answers}
+        is_correct = False
         
-        # Verificar la respuesta enviada
-        submitted_answer = db.query(Answer).filter(Answer.id == answer.answer_id).first()
-        if not submitted_answer:
-            raise HTTPException(status_code=400, detail="Respuesta no válida")
+        if question.question_type == QuestionType.OPEN_ENDED:
+            # Para preguntas abiertas, no evaluamos corrección
+            user_response = UserResponse(
+                participation_id=participation_id,
+                question_id=answer.question_id,
+                answer_id=None,
+                open_answer_text=answer.open_answer_text,
+                response_time=answer.response_time,
+                is_correct=False  # Las preguntas abiertas no se califican automáticamente
+            )
+        else:
+            # Para preguntas de opción múltiple e imágenes
+            if not answer.answer_id:
+                raise HTTPException(status_code=400, detail="answer_id requerido para este tipo de pregunta")
+            
+            # Verificar respuesta correcta
+            correct_answers = db.query(Answer).filter(
+                Answer.question_id == answer.question_id,
+                Answer.is_correct == True
+            ).all()
+            
+            correct_answer_ids = {a.id for a in correct_answers}
+            is_correct = answer.answer_id in correct_answer_ids
+            
+            user_response = UserResponse(
+                participation_id=participation_id,
+                question_id=answer.question_id,
+                answer_id=answer.answer_id,
+                open_answer_text=None,
+                response_time=answer.response_time,
+                is_correct=is_correct
+            )
         
-        is_correct = answer.answer_id in correct_answer_ids
-        
-        # Guardar respuesta
-        user_response = UserResponse(
-            participation_id=participation_id,
-            question_id=answer.question_id,
-            answer_id=answer.answer_id,
-            response_time=answer.response_time,
-            is_correct=is_correct
-        )
         db.add(user_response)
         
-        # Actualizar score
+        # Actualizar score solo para preguntas que se califican automáticamente
         if is_correct:
             participation.score += 1
         
@@ -840,8 +891,10 @@ def submit_answer(participation_id: int, answer: SubmitAnswer, db: Session = Dep
         
         return {
             "correct": is_correct,
-            "current_score": participation.score
+            "current_score": participation.score,
+            "question_type": question.question_type
         }
+        
     except HTTPException:
         raise
     except Exception as e:
