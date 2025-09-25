@@ -882,7 +882,8 @@ def complete_participation(participation_id: int, db: Session = Depends(get_db))
         logger.error(f"Error completing participation: {e}")
         raise HTTPException(status_code=500, detail="Error al completar participación")
 
-# Enhanced participations endpoint
+# Reemplaza la función get_all_participations en tu main.py
+
 @app.get("/api/participations/", response_model=List[ParticipationOut])
 def get_all_participations(
     completed_only: bool = False, 
@@ -890,7 +891,24 @@ def get_all_participations(
     db: Session = Depends(get_db)
 ):
     try:
-        query = db.query(Participation).join(User).join(Quiz)
+        # Usar LEFT JOIN para evitar problemas con datos eliminados
+        query = (
+            db.query(
+                Participation.id,
+                Participation.quiz_id,
+                Participation.user_id,
+                Participation.score,
+                Participation.total_questions,
+                Participation.completed,
+                Participation.started_at,
+                Participation.completed_at,
+                User.name.label('user_name'),
+                User.uni.label('user_uni'),
+                Quiz.title.label('quiz_title')
+            )
+            .outerjoin(User, Participation.user_id == User.id)
+            .outerjoin(Quiz, Participation.quiz_id == Quiz.id)
+        )
         
         if completed_only:
             query = query.filter(Participation.completed == True)
@@ -898,35 +916,92 @@ def get_all_participations(
         if quiz_id:
             query = query.filter(Participation.quiz_id == quiz_id)
         
-        participations = query.order_by(Participation.completed_at.desc()).all()
+        # Agregar order by
+        query = query.order_by(Participation.completed_at.desc())
         
-        result = []
-        for p in participations:
+        # Ejecutar consulta
+        results = query.all()
+        
+        print(f"DEBUG: Found {len(results)} participations")  # Debug log
+        
+        if not results:
+            print("DEBUG: No participations found")
+            return []
+        
+        # Procesar resultados
+        participations_list = []
+        for row in results:
             try:
-                percentage = (p.score / p.total_questions * 100) if p.total_questions > 0 else 0
+                # Calcular porcentaje
+                percentage = 0
+                if row.total_questions > 0:
+                    percentage = (row.score / row.total_questions) * 100
                 
-                result.append({
-                    "id": p.id,
-                    "quiz_title": p.quiz.title if p.quiz else "Quiz Eliminado",
-                    "quiz_id": p.quiz_id,
-                    "user_name": p.user.name if p.user else "Usuario Eliminado",
-                    "user_uni": p.user.uni if p.user else "N/A",
-                    "score": p.score,
-                    "total_questions": p.total_questions,
+                participation_data = {
+                    "id": row.id,
+                    "quiz_id": row.quiz_id,
+                    "quiz_title": row.quiz_title or "Quiz Eliminado",
+                    "user_name": row.user_name or "Usuario Eliminado", 
+                    "user_uni": row.user_uni or "N/A",
+                    "score": row.score,
+                    "total_questions": row.total_questions,
                     "percentage": round(percentage, 2),
-                    "completed": p.completed,
-                    "started_at": p.started_at,
-                    "completed_at": p.completed_at
-                })
+                    "completed": row.completed,
+                    "started_at": row.started_at,
+                    "completed_at": row.completed_at
+                }
+                
+                print(f"DEBUG: Processed participation: {participation_data}")
+                participations_list.append(participation_data)
+                
             except Exception as e:
-                logger.warning(f"Error processing participation {p.id}: {e}")
+                print(f"DEBUG: Error processing row: {e}")
                 continue
         
-        return result
+        return participations_list
         
     except Exception as e:
-        logger.error(f"Error in get_all_participations: {e}")
-        return []  # Return empty list instead of error
+        print(f"DEBUG: Database error in get_all_participations: {e}")
+        import traceback
+        traceback.print_exc()
+        return []
+
+
+# También agrega este endpoint de debug para verificar los datos
+@app.get("/api/debug/participations")
+def debug_participations(db: Session = Depends(get_db)):
+    try:
+        # Contar registros en cada tabla
+        users_count = db.query(User).count()
+        quizzes_count = db.query(Quiz).count() 
+        participations_count = db.query(Participation).count()
+        
+        # Obtener algunas participaciones
+        sample_participations = db.query(Participation).limit(5).all()
+        
+        sample_data = []
+        for p in sample_participations:
+            sample_data.append({
+                "id": p.id,
+                "user_id": p.user_id,
+                "quiz_id": p.quiz_id,
+                "score": p.score,
+                "completed": p.completed,
+                "user_exists": db.query(User).filter(User.id == p.user_id).first() is not None,
+                "quiz_exists": db.query(Quiz).filter(Quiz.id == p.quiz_id).first() is not None
+            })
+        
+        return {
+            "counts": {
+                "users": users_count,
+                "quizzes": quizzes_count,
+                "participations": participations_count
+            },
+            "sample_participations": sample_data
+        }
+        
+    except Exception as e:
+        return {"error": str(e)}
 
 @app.delete("/api/participations/{participation_id}")
 def delete_participation(participation_id: int, db: Session = Depends(get_db)):
