@@ -143,17 +143,6 @@ class QuizUpdate(BaseModel):
     description: Optional[str] = None
     is_active: Optional[bool] = None
 
-class QuizOut(BaseModel):  # ← ESTA ES LA CLASE FALTANTE
-    id: int
-    title: str
-    area: str
-    description: Optional[str] = None
-    is_active: bool
-    created_at: Optional[datetime] = None
-    
-    class Config:
-        from_attributes = True
-
 class QuestionType(str, Enum):
     MULTIPLE_CHOICE = "multiple_choice"
     OPEN_ENDED = "open_ended"
@@ -199,6 +188,28 @@ class QuestionOut(BaseModel):
     question_order: int
     time_limit: int
     answers: List[AnswerOut]
+    
+    class Config:
+        from_attributes = True
+
+class QuizOut(BaseModel):  # ← ESTA ES LA CLASE FALTANTE
+    id: int
+    title: str
+    area: str
+    description: Optional[str] = None
+    is_active: bool
+    created_at: Optional[datetime] = None
+    
+    class Config:
+        from_attributes = True
+
+class QuizDetailOut(BaseModel):
+    id: int
+    title: str
+    area: str
+    description: Optional[str] = None
+    is_active: bool
+    questions: List[QuestionOut]
     
     class Config:
         from_attributes = True
@@ -514,7 +525,7 @@ def get_quiz(quiz_id: int, db: Session = Depends(get_db)):
                     "id": a.id, 
                     "answer_text": a.answer_text, 
                     "answer_order": a.answer_order,
-                    "is_correct": a.is_correct  # Include for admin
+                    "is_correct": a.is_correct
                 })
             questions.append({
                 "id": q.id,
