@@ -966,6 +966,35 @@ def get_all_participations(
         traceback.print_exc()
         return []
 
+@app.get("/api/participations/{participation_id}/responses")
+def get_participation_responses(participation_id: int, db: Session = Depends(get_db)):
+    try:
+        responses = (
+            db.query(UserResponse, Question, Answer, User, Participation)
+            .join(Question, UserResponse.question_id == Question.id)
+            .join(Answer, UserResponse.answer_id == Answer.id)
+            .join(Participation, UserResponse.participation_id == Participation.id)
+            .join(User, Participation.user_id == User.id)
+            .filter(UserResponse.participation_id == participation_id)
+            .all()
+        )
+        
+        result = []
+        for ur, q, a, u, p in responses:
+            result.append({
+                "user_name": u.name,
+                "user_uni": u.uni,
+                "question_order": q.question_order,
+                "question_text": q.question_text,
+                "answer_text": a.answer_text,
+                "is_correct": ur.is_correct,
+                "response_time": ur.response_time,
+                "completed_at": p.completed_at
+            })
+        return result
+    except Exception as e:
+        logger.error(f"Error fetching responses: {e}")
+        raise HTTPException(status_code=500, detail="Error al obtener respuestas")
 
 # También agrega este endpoint de debug para verificar los datos
 @app.get("/api/debug/participations")

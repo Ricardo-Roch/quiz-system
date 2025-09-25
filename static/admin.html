@@ -1077,26 +1077,24 @@ async function handleQuizSelectChange(e) {
 
 async function loadLeaderboard(quizId) {
   try {
-    // 1. Obtener todas las participaciones completadas
+    // Usar endpoint existente de participaciones generales y filtrar
     const response = await fetch(`${API_BASE_URL}/api/participations/?completed_only=true`);
-
+    
     if (!response.ok) {
-      throw new Error("Error al obtener participaciones");
+      throw new Error('Error al obtener participaciones');
     }
+    
     const allParticipations = await response.json();
-
-    // 2. Obtener el quiz actual
+    
+    // Obtener información del quiz seleccionado
     const quizResponse = await fetch(`${API_BASE_URL}/api/quizzes/${quizId}`);
-    if (!quizResponse.ok) {
-      throw new Error("Quiz no encontrado");
-    }
     const selectedQuiz = await quizResponse.json();
-
-    // 3. Filtrar participaciones por quiz_id
-    const participations = allParticipations.filter(p => p.quiz_id === quizId);
-
+    
+    // Filtrar participaciones por el quiz seleccionado
+    const participations = allParticipations.filter(p => p.quiz_title === selectedQuiz.title);
+    
     if (participations.length === 0) {
-      document.getElementById("leaderboard").innerHTML = `
+      document.getElementById('leaderboard').innerHTML = `
         <div class="empty-leaderboard">
           <div class="icon">🏆</div>
           <h4>No hay participaciones aún</h4>
@@ -1105,25 +1103,21 @@ async function loadLeaderboard(quizId) {
       `;
       return;
     }
-
-    // 4. Ordenar ranking: primero % y después score
+    
+    // Ordenar por porcentaje y luego por score
     const rankings = participations.sort((a, b) => {
       if (b.percentage !== a.percentage) {
         return b.percentage - a.percentage;
       }
       return b.score - a.score;
     });
-
-    // 5. Guardar datos globales (para exportar/graficar después)
-    window.currentLeaderboardData = rankings;
-
-    // 6. Generar HTML
+    
+    // Generar HTML del leaderboard
     const leaderboardHtml = rankings.map((participant, index) => {
       const rank = index + 1;
-      const rankClass = rank <= 3 ? `rank-${rank}` : "";
-      const totalScore = `${participant.score}/${participant.total_questions}`;
-      const percent = `${participant.percentage.toFixed(1)}%`;
-
+      const rankClass = rank <= 3 ? `rank-${rank}` : '';
+      const totalScore = Math.round(participant.percentage * 10); // Score basado en porcentaje
+      
       return `
         <div class="leaderboard-item ${rankClass}">
           <div class="rank-info">
@@ -1134,53 +1128,62 @@ async function loadLeaderboard(quizId) {
             </div>
           </div>
           <div class="score-info">
-            <div class="percentage">${percent}</div>
+            <div class="total-score">${totalScore}</div>
             <div class="score-details">
-              ${totalScore} correctas
+              ${participant.score}/${participant.total_questions} correctas
+              <br>
+              ${participant.percentage.toFixed(1)}% precisión
             </div>
           </div>
         </div>
       `;
-    }).join("");
-
-    document.getElementById("leaderboard").innerHTML = leaderboardHtml;
-
+    }).join('');
+    
+    document.getElementById('leaderboard').innerHTML = leaderboardHtml;
+    
   } catch (error) {
-    console.error("Error en loadLeaderboard:", error);
-    document.getElementById("leaderboard").innerHTML = `
+    console.error('Error in loadLeaderboard:', error);
+    document.getElementById('leaderboard').innerHTML = `
       <div class="error">
-        ❌ Error al cargar el ranking: ${error.message}
+        Error al cargar el ranking: ${error.message}
       </div>
     `;
   }
 }
 
-
 async function loadResponsesTable(quizId) {
   try {
-    const res = await fetch(`${API_BASE_URL}/api/quizzes/${quizId}/responses`);
-    const responses = await res.json();
+    // Obtener información del quiz
+    const quizResponse = await fetch(`${API_BASE_URL}/api/quizzes/${quizId}`);
+    const quiz = await quizResponse.json();
+    
+    // Obtener participaciones del quiz
+    const participationsResponse = await fetch(`${API_BASE_URL}/api/participations/?completed_only=true&quiz_id=${quizId}`);
+    const participations = await participationsResponse.json();
 
-    // GUARDAR las respuestas en la variable global para exportar
+    let responses = [];
+
+    for (const participation of participations) {
+      // Llamar al endpoint de respuestas reales
+      const res = await fetch(`${API_BASE_URL}/api/participations/${participation.id}/responses`);
+      const data = await res.json();
+      responses = responses.concat(data);
+    }
+
     currentResponsesData = responses;
 
-    // Si no hay respuestas
     if (responses.length === 0) {
       document.getElementById('responsesTable').innerHTML = `
         <div class="responses-table">
           <table class="table table-striped table-compact">
             <thead>
               <tr>
-                <th>Usuario</th>
-                <th>Pregunta</th>
-                <th>Respuesta</th>
-                <th>Correcta</th>
-                <th>Tiempo (ms)</th>
-                <th>Fecha</th>
+                <th>Usuario</th><th>UNI</th><th>Pregunta #</th><th>Pregunta</th>
+                <th>Respuesta Seleccionada</th><th>Correcta</th><th>Tiempo (ms)</th><th>Fecha</th>
               </tr>
             </thead>
             <tbody>
-              <tr><td colspan="6" class="empty-table">No hay respuestas registradas</td></tr>
+              <tr><td colspan="8" class="empty-table">No hay respuestas registradas</td></tr>
             </tbody>
           </table>
         </div>
@@ -1188,85 +1191,19 @@ async function loadResponsesTable(quizId) {
       return;
     }
 
-    // Generar filas
-    const tableRows = responses.map(r => `
-      <tr>
-        <td>${r.user_name} (${r.user_uni})</td>
-        <td style="max-width: 300px; word-wrap: break-word;">${r.question_text}</td>
-        <td style="max-width: 200px; word-wrap: break-word;">${r.answer_text}</td>
-        <td class="${r.is_correct ? 'correct-answer' : 'incorrect-answer'}">
-          ${r.is_correct ? "✔️ Sí" : "❌ No"}
-        </td>
-        <td class="response-time">${r.response_time} ms</td>
-        <td>${new Date(r.answered_at).toLocaleString()}</td>
-      </tr>
-    `).join("");
+    // Ordenar respuestas
+    responses.sort((a, b) => {
+      if (a.user_uni !== b.user_uni) return a.user_uni.localeCompare(b.user_uni);
+      return a.question_order - b.question_order;
+    });
 
-    // Pintar tabla
-    document.getElementById("responsesTable").innerHTML = `
-      <div class="responses-table">
-        <table class="table table-striped table-compact">
-          <thead>
-            <tr>
-              <th>Usuario</th>
-              <th>Pregunta</th>
-              <th>Respuesta</th>
-              <th>Correcta</th>
-              <th>Tiempo (ms)</th>
-              <th>Fecha</th>
-            </tr>
-          </thead>
-          <tbody>${tableRows}</tbody>
-        </table>
-      </div>
-    `;
+    // Aquí ya renderizas la tabla con respuestas reales
+    renderResponsesTable(responses);
 
-  } catch (error) {
-    console.error("Error cargando respuestas:", error);
-    currentResponsesData = []; // Limpiar en caso de error
-    document.getElementById("responsesTable").innerHTML = `
-      <div class="error">Error al cargar respuestas: ${error.message}</div>
-    `;
+  } catch (err) {
+    console.error("Error cargando respuestas:", err);
   }
 }
-
-// También actualizar la función de exportar para usar los datos correctos
-function exportResponses() {
-  if (!currentResponsesData || currentResponsesData.length === 0) {
-    alert('No hay datos para exportar');
-    return;
-  }
-  
-  const quizSelect = document.getElementById('quizSelect');
-  const selectedQuizText = quizSelect.options[quizSelect.selectedIndex].text;
-  
-  // Mapear los datos correctamente según la estructura del backend
-  const csvData = currentResponsesData.map(response => ({
-    'Usuario': response.user_name,
-    'UNI': response.user_uni,
-    'Pregunta #': response.question_order,
-    'Pregunta': response.question_text,
-    'Respuesta Seleccionada': response.answer_text,
-    'Respuesta Correcta': response.correct_answer_text,
-    'Es Correcta': response.is_correct ? 'Sí' : 'No',
-    'Tiempo Respuesta (ms)': response.response_time,
-    'Fecha Respondida': new Date(response.answered_at).toLocaleString()
-  }));
-  
-  const csv = convertToCSV(csvData);
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const link = document.createElement('a');
-  const url = URL.createObjectURL(blob);
-  link.setAttribute('href', url);
-  link.setAttribute('download', `respuestas_${selectedQuizText.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.csv`);
-  link.style.visibility = 'hidden';
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  
-  showSuccess('Archivo CSV descargado exitosamente');
-}
-
 
 
 function exportResponses() {
