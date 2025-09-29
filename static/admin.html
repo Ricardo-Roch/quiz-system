@@ -1972,10 +1972,20 @@ function addAnswerField(imageUrlOrText = '', isCorrect = false, isReference = fa
     let textValue = '';
     
     // Determinar si es URL de imagen o texto
-    if (imageUrlOrText && (imageUrlOrText.includes('http') || imageUrlOrText.includes('imgur'))) {
+    if (imageUrlOrText && (imageUrlOrText.includes('http') || imageUrlOrText.includes('imgur') || imageUrlOrText.includes('i.ibb.co'))) {
       selectedImage = imageUrlOrText;
     } else {
       textValue = imageUrlOrText;
+    }
+    
+    // Crear opciones del selector
+    let imageOptions = '<option value="">Selecciona imagen</option>';
+    if (availableImages && availableImages.answers && availableImages.answers.length > 0) {
+      imageOptions += availableImages.answers.map(img => {
+        const fileName = img.split('/').pop();
+        const selected = img === selectedImage ? 'selected' : '';
+        return `<option value="${img}" ${selected}>${fileName}</option>`;
+      }).join('');
     }
     
     answerDiv.innerHTML = `
@@ -1983,12 +1993,7 @@ function addAnswerField(imageUrlOrText = '', isCorrect = false, isReference = fa
         <div style="flex: 1;">
           <label style="display: block; margin-bottom: 4px; font-weight: 600;">Imagen</label>
           <select class="form-select answer-image-select">
-            <option value="">Selecciona imagen</option>
-            ${availableImages.answers.map(img => {
-              const fileName = img.split('/').pop();
-              const selected = img === selectedImage ? 'selected' : '';
-              return `<option value="${img}" ${selected}>${fileName}</option>`;
-            }).join('')}
+            ${imageOptions}
           </select>
         </div>
         <div style="flex: 1;">
@@ -2006,17 +2011,19 @@ function addAnswerField(imageUrlOrText = '', isCorrect = false, isReference = fa
       <div class="answer-image-preview" style="text-align: center; min-height: 50px;"></div>
     `;
     
-    // Preview de imagen
+    // Configurar preview de imagen
     const select = answerDiv.querySelector('.answer-image-select');
     const preview = answerDiv.querySelector('.answer-image-preview');
     
-    if (selectedImage) {
-      preview.innerHTML = `<img src="${selectedImage}" style="max-width: 200px; max-height: 200px; border-radius: 8px; border: 2px solid #10b981;">`;
+    // Si hay imagen seleccionada, mostrar preview inmediatamente
+    if (selectedImage && selectedImage.trim() !== '') {
+      preview.innerHTML = `<img src="${selectedImage}" style="max-width: 200px; max-height: 200px; border-radius: 8px; border: 2px solid #10b981;" onerror="this.style.display='none'">`;
     }
     
+    // Event listener para cambios
     select.addEventListener('change', (e) => {
       if (e.target.value) {
-        preview.innerHTML = `<img src="${e.target.value}" style="max-width: 200px; max-height: 200px; border-radius: 8px; border: 2px solid #10b981;">`;
+        preview.innerHTML = `<img src="${e.target.value}" style="max-width: 200px; max-height: 200px; border-radius: 8px; border: 2px solid #10b981;" onerror="this.style.display='none'">`;
       } else {
         preview.innerHTML = '<p style="color: #94a3b8;">Sin imagen seleccionada</p>';
       }
@@ -2051,6 +2058,7 @@ function addAnswerField(imageUrlOrText = '', isCorrect = false, isReference = fa
   
   container.appendChild(answerDiv);
 }
+
 
 // Modificar handleQuestionSubmit - VERSIÓN COMPLETA CORREGIDA
 async function handleQuestionSubmit(e) {
