@@ -1877,10 +1877,9 @@ function handleQuestionTypeChange() {
   const imageGroup = document.getElementById('questionImageGroup');
   const answersContainer = document.getElementById('answersContainer');
   
-  // Mostrar/ocultar campo de imagen
+  // Mostrar/ocultar campo de imagen de pregunta
   if (questionType === 'image_choice') {
     imageGroup.style.display = 'block';
-    // Crear selector dinámico
     imageGroup.innerHTML = `
       <label class="form-label">Imagen de la Pregunta</label>
       <select id="questionImageSelect" class="form-select">
@@ -1905,9 +1904,20 @@ function handleQuestionTypeChange() {
     imageGroup.style.display = 'none';
   }
   
-  // Resto del código igual...
+  // Limpiar respuestas y recrear según tipo
+  answersContainer.innerHTML = '';
+  answerCount = 0;
+  
+  if (questionType === 'open_ended') {
+    // Para preguntas abiertas: una sola respuesta de referencia
+    addAnswerField('Respuesta de referencia (opcional)', false, true);
+  } else {
+    // Para otros tipos: 4 respuestas por defecto
+    for (let i = 0; i < 4; i++) {
+      addAnswerField();
+    }
+  }
 }
-
 // Modificar función addAnswerField
 function addAnswerField(text = '', isCorrect = false, isReference = false) {
   answerCount++;
@@ -1922,17 +1932,19 @@ function addAnswerField(text = '', isCorrect = false, isReference = false) {
   answerDiv.dataset.answerIndex = answerCount;
   
   let inputField = '';
-if (questionType === 'image_choice') {
-  inputField = `
-    <select class="form-select answer-image-select" style="flex: 1;">
-      <option value="">Selecciona imagen</option>
-      ${availableImages.answers.map(img => 
-        `<option value="${img}">${img.split('/').pop()}</option>`
-      ).join('')}
-    </select>
-    <input type="text" class="form-input answer-text" placeholder="Descripción" value="${text}" style="flex: 1;">
-  `;
-}
+  if (questionType === 'image_choice') {
+    inputField = `
+      <select class="form-select answer-image-select" style="flex: 1;">
+        <option value="">Selecciona imagen</option>
+        ${availableImages.answers.map(img => 
+          `<option value="${img}">${img.split('/').pop()}</option>`
+        ).join('')}
+      </select>
+      <input type="text" class="form-input answer-text" placeholder="Descripción (opcional)" value="${text}" style="flex: 1;">
+    `;
+  } else {
+    inputField = `<input type="text" class="form-input answer-text" placeholder="Respuesta ${answerCount}" value="${text}" required>`;
+  }
   
   const correctRadio = isReference ? '' : `
     <label style="display: flex; align-items: center; gap: 4px; white-space: nowrap;">
@@ -1949,64 +1961,20 @@ if (questionType === 'image_choice') {
   container.appendChild(answerDiv);
 }
 
-// Función para subir imagen
-async function uploadImage(fileInput) {
-  const file = fileInput.files[0];
-  if (!file) return null;
-  
-  const formData = new FormData();
-  formData.append('file', file);
-  
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/upload-image`, {
-      method: 'POST',
-      body: formData
-    });
-    
-    // LOG para debugging
-    console.log('Upload response status:', response.status);
-    
-    if (response.ok) {
-      const data = await response.json();
-      console.log('Upload response data:', data);
-      return data.image_url;
-    } else {
-      // Intentar leer el mensaje de error del servidor
-      const errorData = await response.json().catch(() => ({}));
-      console.error('Server error:', errorData);
-      throw new Error(errorData.detail || 'Error al subir imagen');
-    }
-  } catch (error) {
-    console.error('Error uploading image:', error);
-    alert(`Error al subir imagen: ${error.message}`);
-    return null;
-  }
-}
-
 // Modificar handleQuestionSubmit
+// Modificar handleQuestionSubmit - VERSIÓN COMPLETA CORREGIDA
 async function handleQuestionSubmit(e) {
   e.preventDefault();
   
   const questionId = document.getElementById('questionId').value;
   const questionType = document.getElementById('questionType').value;
   
-  // Subir imagen de pregunta si existe
- // Cambiar esta parte:
-let questionImageUrl = null;
-const questionImageSelect = document.getElementById('questionImageSelect');
-if (questionImageSelect) {
-  questionImageUrl = questionImageSelect.value || null;
-}
-
-// Para las respuestas de imagen:
-if (questionType === 'image_choice') {
-  const imageSelect = div.querySelector('.answer-image-select');
-  const textInput = div.querySelector('.answer-text');
-  
-  imageUrl = imageSelect ? imageSelect.value : null;
-  answerText = textInput ? textInput.value : null;
-  // ...
-}
+  // Obtener imagen de pregunta del selector (no upload)
+  let questionImageUrl = null;
+  const questionImageSelect = document.getElementById('questionImageSelect');
+  if (questionImageSelect) {
+    questionImageUrl = questionImageSelect.value || null;
+  }
   
   // Procesar respuestas según tipo
   const answers = [];
@@ -2021,17 +1989,17 @@ if (questionType === 'image_choice') {
     let isCorrect = false;
     
     if (questionType === 'image_choice') {
-      const imageInput = div.querySelector('.answer-image');
+      // Para image_choice: obtener del SELECT, no del file input
+      const imageSelect = div.querySelector('.answer-image-select');
       const textInput = div.querySelector('.answer-text');
       
-      if (imageInput && imageInput.files[0]) {
-        imageUrl = await uploadImage(imageInput);
-      }
+      imageUrl = imageSelect ? imageSelect.value : null;
       answerText = textInput ? textInput.value : null;
       
       const correctRadio = div.querySelector(`input[name="correctAnswer"][value="${answerIndex}"]`);
       isCorrect = correctRadio ? correctRadio.checked : false;
     } else {
+      // Para otros tipos
       const textInput = div.querySelector('.answer-text');
       answerText = textInput ? textInput.value : null;
       
@@ -2067,7 +2035,7 @@ if (questionType === 'image_choice') {
     answers: answers
   };
   
-  // Enviar datos (resto igual que antes)
+  // Enviar datos
   try {
     let response;
     if (questionId) {
@@ -2097,8 +2065,6 @@ if (questionType === 'image_choice') {
     alert('Error al guardar la pregunta');
   }
 }
-
-
 
 
 //de aquii ------------------------------------------------------------------------------------------------------------------------------------
