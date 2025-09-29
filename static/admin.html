@@ -2036,14 +2036,16 @@ function addAnswerField(imageUrlOrText = '', isCorrect = false, isReference = fa
     let selectedImage = '';
     let textValue = '';
     
-    // Determinar si es URL de imagen o texto
-    if (imageUrlOrText && (imageUrlOrText.includes('http') || imageUrlOrText.includes('imgur') || imageUrlOrText.includes('i.ibb.co'))) {
-      selectedImage = imageUrlOrText;
-    } else {
-      textValue = imageUrlOrText;
+    // VALIDAR QUE SEA STRING antes de usar .includes()
+    if (imageUrlOrText && typeof imageUrlOrText === 'string') {
+      if (imageUrlOrText.includes('http') || imageUrlOrText.includes('imgur') || imageUrlOrText.includes('i.ibb.co')) {
+        selectedImage = imageUrlOrText;
+      } else {
+        textValue = imageUrlOrText;
+      }
     }
     
-    // Crear opciones del selector DE RESPUESTAS (no preguntas)
+    // Crear opciones del selector DE RESPUESTAS
     let imageOptions = '<option value="">Selecciona imagen</option>';
     if (availableImages && availableImages.answers && availableImages.answers.length > 0) {
       imageOptions += availableImages.answers.map(img => {
@@ -2096,20 +2098,24 @@ function addAnswerField(imageUrlOrText = '', isCorrect = false, isReference = fa
     
   } else if (questionType === 'open_ended') {
     // RESPUESTA ABIERTA (SOLO REFERENCIA)
+    const safeText = imageUrlOrText && typeof imageUrlOrText === 'string' ? imageUrlOrText : '';
+    
     answerDiv.innerHTML = `
       <div style="display: flex; gap: 12px; align-items: center;">
         <div style="flex: 1;">
           <label style="display: block; margin-bottom: 4px; font-weight: 600;">Respuesta de Referencia</label>
-          <textarea class="form-input answer-text" placeholder="Respuesta esperada (solo como referencia)" rows="3" required>${imageUrlOrText}</textarea>
+          <textarea class="form-input answer-text" placeholder="Respuesta esperada (solo como referencia)" rows="3" required>${safeText}</textarea>
           <small style="color: var(--text-muted); display: block; margin-top: 4px;">Esta respuesta es solo referencial, las preguntas abiertas no se califican automáticamente</small>
         </div>
       </div>
     `;
   } else {
     // RESPUESTAS DE TEXTO (OPCIÓN MÚLTIPLE)
+    const safeText = imageUrlOrText && typeof imageUrlOrText === 'string' ? imageUrlOrText : '';
+    
     answerDiv.innerHTML = `
       <div style="display: flex; gap: 12px; align-items: center;">
-        <input type="text" class="form-input answer-text" placeholder="Respuesta ${answerCount}" value="${imageUrlOrText}" required style="flex: 1;">
+        <input type="text" class="form-input answer-text" placeholder="Respuesta ${answerCount}" value="${safeText}" required style="flex: 1;">
         ${isReference ? '' : `
         <label style="display: flex; align-items: center; gap: 4px;">
           <input type="radio" name="correctAnswer" value="${answerCount}" ${isCorrect ? 'checked' : ''}>
