@@ -487,7 +487,58 @@ async def upload_image(file: UploadFile = File(...)):
         logger.error(f"Error uploading image: {e}")
         raise HTTPException(status_code=500, detail=f"Error al subir imagen: {str(e)}")
     
-
+@app.post("/api/test-upload")
+async def test_upload(file: UploadFile = File(...)):
+    """Endpoint de prueba para diagnosticar errores de upload"""
+    try:
+        # Log información del archivo
+        logger.info(f"Filename: {file.filename}")
+        logger.info(f"Content-Type: {file.content_type}")
+        
+        # Validar tipo
+        if not file.content_type.startswith('image/'):
+            return {"error": "No es imagen", "content_type": file.content_type}
+        
+        # Leer archivo
+        contents = await file.read()
+        logger.info(f"File size: {len(contents)} bytes")
+        
+        # Intentar convertir a base64
+        b64_image = base64.b64encode(contents).decode('utf-8')
+        logger.info(f"Base64 length: {len(b64_image)}")
+        
+        # Intentar subir a Imgur
+        headers = {"Authorization": "Client-ID 546c25a59c58ad7"}
+        data = {"image": b64_image, "type": "base64"}
+        
+        logger.info("Sending request to Imgur...")
+        response = requests.post(
+            "https://api.imgur.com/3/image",
+            headers=headers,
+            data=data,
+            timeout=30
+        )
+        
+        logger.info(f"Imgur response status: {response.status_code}")
+        logger.info(f"Imgur response: {response.text}")
+        
+        if response.status_code == 200:
+            result = response.json()
+            return {"success": True, "url": result['data']['link']}
+        else:
+            return {
+                "success": False, 
+                "status_code": response.status_code,
+                "response": response.text
+            }
+            
+    except Exception as e:
+        logger.error(f"Exception: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return {"error": str(e), "traceback": traceback.format_exc()}
+    
+    
 @app.get("/api/debug/files")
 def debug_files():
     """Endpoint para verificar archivos en el servidor"""
