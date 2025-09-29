@@ -1886,17 +1886,22 @@ function handleQuestionTypeChange() {
     imageGroup.style.display = 'none';
   }
   
-  // Solo recrear respuestas si NO está editando
-  if (!questionId) {
-    answersContainer.innerHTML = '';
-    answerCount = 0;
-    
-    if (questionType === 'open_ended') {
-      addAnswerField('', false, true);
-    } else {
-      for (let i = 0; i < 4; i++) {
-        addAnswerField();
-      }
+  // IMPORTANTE: SIEMPRE recrear respuestas al cambiar tipo
+  // Incluso si está editando, porque el formato de respuesta cambia
+  answersContainer.innerHTML = '';
+  answerCount = 0;
+  
+  if (questionType === 'open_ended') {
+    addAnswerField('', false, true);
+  } else if (questionType === 'image_choice') {
+    // Para selección de imagen, crear 4 campos vacíos
+    for (let i = 0; i < 4; i++) {
+      addAnswerField('', false, false);
+    }
+  } else {
+    // Para opción múltiple, crear 4 campos de texto
+    for (let i = 0; i < 4; i++) {
+      addAnswerField('', false, false);
     }
   }
 }
