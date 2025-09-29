@@ -1816,8 +1816,6 @@ function openQuestionModal(question = null) {
   const form = document.getElementById('questionForm');
   
   document.getElementById('questionQuizId').value = currentQuizId;
-  
-  // Reset answer count
   answerCount = 0;
   
   if (question) {
@@ -1826,31 +1824,54 @@ function openQuestionModal(question = null) {
     document.getElementById('questionText').value = question.question_text;
     document.getElementById('questionOrder').value = question.question_order;
     document.getElementById('questionTimeLimit').value = question.time_limit;
+    document.getElementById('questionType').value = question.question_type || 'multiple_choice';
     
-    // Load existing answers
+    handleQuestionTypeChange();
+    
+    // Cargar imagen de pregunta
+    if (question.image_url) {
+      setTimeout(() => {
+        const select = document.getElementById('questionImageSelect');
+        if (select) select.value = question.image_url;
+      }, 100);
+    }
+    
+    // Cargar respuestas
     const container = document.getElementById('answersContainer');
     container.innerHTML = '';
     
-    question.answers.forEach((answer, index) => {
-      addAnswerField(answer.answer_text, answer.is_correct);
+    question.answers.forEach((answer) => {
+      if (question.question_type === 'image_choice') {
+        // Pasar la URL como primer parámetro
+        addAnswerField(answer.image_url || '', answer.is_correct);
+        // Actualizar el campo de texto si existe
+        if (answer.answer_text) {
+          const lastDiv = container.lastElementChild;
+          const textInput = lastDiv.querySelector('.answer-text');
+          if (textInput) textInput.value = answer.answer_text;
+        }
+      } else {
+        addAnswerField(answer.answer_text || '', answer.is_correct);
+      }
     });
+    
   } else {
     title.textContent = 'Agregar Pregunta';
     form.reset();
     document.getElementById('questionId').value = '';
-    document.getElementById('questionQuizId').value = currentQuizId;
+    document.getElementById('questionType').value = 'multiple_choice';
+    handleQuestionTypeChange();
     
-    // Reset answers and add 4 default fields
     const container = document.getElementById('answersContainer');
     container.innerHTML = '';
-    
-    for (let i = 0; i < 4; i++) {
-      addAnswerField();
-    }
+    for (let i = 0; i < 4; i++) addAnswerField();
   }
   
   modal.classList.add('show');
 }
+
+
+
 //de aquii ------------------------------------------------------------------------------------------------------------------------------------
 function removeAnswerField(button) {
   const questionType = document.getElementById('questionType').value;
@@ -1919,7 +1940,7 @@ function handleQuestionTypeChange() {
   }
 }
 // Modificar función addAnswerField
-function addAnswerField(text = '', isCorrect = false, isReference = false) {
+function addAnswerField(textOrUrl = '', isCorrect = false, isReference = false) {
   answerCount++;
   const container = document.getElementById('answersContainer');
   const questionType = document.getElementById('questionType').value;
@@ -1932,22 +1953,36 @@ function addAnswerField(text = '', isCorrect = false, isReference = false) {
   answerDiv.dataset.answerIndex = answerCount;
   
   let inputField = '';
+  
   if (questionType === 'image_choice') {
+    // Selector de imagen
+    let selectedUrl = '';
+    let textValue = '';
+    
+    // Si textOrUrl es una URL (contiene http), es una imagen
+    if (textOrUrl && textOrUrl.includes('http')) {
+      selectedUrl = textOrUrl;
+    } else {
+      textValue = textOrUrl;
+    }
+    
     inputField = `
       <select class="form-select answer-image-select" style="flex: 1;">
         <option value="">Selecciona imagen</option>
-        ${availableImages.answers.map(img => 
-          `<option value="${img}">${img.split('/').pop()}</option>`
-        ).join('')}
+        ${availableImages.answers.map(img => {
+          const fileName = img.split('/').pop();
+          const selected = img === selectedUrl ? 'selected' : '';
+          return `<option value="${img}" ${selected}>${fileName}</option>`;
+        }).join('')}
       </select>
-      <input type="text" class="form-input answer-text" placeholder="Descripción (opcional)" value="${text}" style="flex: 1;">
+      <input type="text" class="form-input answer-text" placeholder="Descripción" value="${textValue}" style="flex: 1;">
     `;
   } else {
-    inputField = `<input type="text" class="form-input answer-text" placeholder="Respuesta ${answerCount}" value="${text}" required>`;
+    inputField = `<input type="text" class="form-input answer-text" placeholder="Respuesta ${answerCount}" value="${textOrUrl}" required style="flex: 1;">`;
   }
   
   const correctRadio = isReference ? '' : `
-    <label style="display: flex; align-items: center; gap: 4px; white-space: nowrap;">
+    <label style="display: flex; align-items: center; gap: 4px;">
       <input type="radio" name="correctAnswer" value="${answerCount}" ${isCorrect ? 'checked' : ''}>
       Correcta
     </label>
@@ -1960,7 +1995,6 @@ function addAnswerField(text = '', isCorrect = false, isReference = false) {
   answerDiv.innerHTML = inputField + correctRadio + removeButton;
   container.appendChild(answerDiv);
 }
-
 // Modificar handleQuestionSubmit
 // Modificar handleQuestionSubmit - VERSIÓN COMPLETA CORREGIDA
 async function handleQuestionSubmit(e) {
@@ -1969,16 +2003,18 @@ async function handleQuestionSubmit(e) {
   const questionId = document.getElementById('questionId').value;
   const questionType = document.getElementById('questionType').value;
   
-  // Obtener imagen de pregunta del selector (no upload)
+  // Obtener imagen de pregunta
   let questionImageUrl = null;
   const questionImageSelect = document.getElementById('questionImageSelect');
-  if (questionImageSelect) {
-    questionImageUrl = questionImageSelect.value || null;
+  if (questionImageSelect && questionImageSelect.value) {
+    questionImageUrl = questionImageSelect.value;
   }
   
-  // Procesar respuestas según tipo
+  // Procesar respuestas
   const answers = [];
   const answerDivs = document.querySelectorAll('[data-answer-index]');
+  
+  console.log(`Procesando ${answerDivs.length} respuestas...`);
   
   for (let i = 0; i < answerDivs.length; i++) {
     const div = answerDivs[i];
@@ -1989,19 +2025,26 @@ async function handleQuestionSubmit(e) {
     let isCorrect = false;
     
     if (questionType === 'image_choice') {
-      // Para image_choice: obtener del SELECT, no del file input
       const imageSelect = div.querySelector('.answer-image-select');
       const textInput = div.querySelector('.answer-text');
       
-      imageUrl = imageSelect ? imageSelect.value : null;
-      answerText = textInput ? textInput.value : null;
+      if (imageSelect) {
+        imageUrl = imageSelect.value || null;
+        console.log(`Respuesta ${i+1}: image_url = ${imageUrl}`);
+      }
+      
+      if (textInput) {
+        answerText = textInput.value || null;
+      }
       
       const correctRadio = div.querySelector(`input[name="correctAnswer"][value="${answerIndex}"]`);
       isCorrect = correctRadio ? correctRadio.checked : false;
+      
     } else {
-      // Para otros tipos
       const textInput = div.querySelector('.answer-text');
-      answerText = textInput ? textInput.value : null;
+      if (textInput) {
+        answerText = textInput.value || null;
+      }
       
       if (questionType !== 'open_ended') {
         const correctRadio = div.querySelector(`input[name="correctAnswer"][value="${answerIndex}"]`);
@@ -2018,6 +2061,14 @@ async function handleQuestionSubmit(e) {
   }
   
   // Validaciones
+  if (questionType === 'image_choice') {
+    const hasImage = answers.some(a => a.image_url && a.image_url.trim() !== '');
+    if (!hasImage) {
+      alert('Debes seleccionar al menos una imagen para las respuestas');
+      return;
+    }
+  }
+  
   if (questionType !== 'open_ended') {
     const hasCorrect = answers.some(a => a.is_correct);
     if (!hasCorrect) {
@@ -2035,7 +2086,8 @@ async function handleQuestionSubmit(e) {
     answers: answers
   };
   
-  // Enviar datos
+  console.log('Datos finales a enviar:', JSON.stringify(questionData, null, 2));
+  
   try {
     let response;
     if (questionId) {
@@ -2055,18 +2107,18 @@ async function handleQuestionSubmit(e) {
     if (response.ok) {
       closeModal('questionModal');
       loadQuestions();
-      showSuccess(questionId ? 'Pregunta actualizada exitosamente' : 'Pregunta creada exitosamente');
+      showSuccess(questionId ? 'Pregunta actualizada' : 'Pregunta creada');
     } else {
-      throw new Error('Error en la respuesta del servidor');
+      const errorData = await response.json();
+      console.error('Error del servidor:', errorData);
+      alert('Error: ' + (errorData.detail || 'Error desconocido'));
     }
     
   } catch (error) {
-    console.error('Error saving question:', error);
-    alert('Error al guardar la pregunta');
+    console.error('Error:', error);
+    alert('Error al guardar: ' + error.message);
   }
 }
-
-
 //de aquii ------------------------------------------------------------------------------------------------------------------------------------
 // Utility Functions
 function closeModal(modalId) {

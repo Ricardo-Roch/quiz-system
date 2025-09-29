@@ -695,46 +695,68 @@ function showQuestion() {
   const question = questions[currentQuestionIndex];
   
   qIndex.textContent = currentQuestionIndex + 1;
-  questionText.textContent = question.question_text;
+  
+  // IMPORTANTE: Limpiar el contenido anterior
+  questionText.innerHTML = '';
+  answers.innerHTML = '';
+  
+  // Mostrar texto de la pregunta
+  const questionTextEl = document.createElement('div');
+  questionTextEl.textContent = question.question_text;
+  questionText.appendChild(questionTextEl);
   
   // Mostrar imagen de la pregunta si existe
   if (question.image_url) {
-    questionText.innerHTML = `
-      ${question.question_text}
-      <div style="margin-top: 16px;">
-        <img src="${question.image_url}" alt="Imagen de la pregunta" class="question-image" style="max-width: 100%; max-height: 300px; border-radius: 8px;">
-      </div>
-    `;
+    const questionImageEl = document.createElement('img');
+    questionImageEl.src = question.image_url;
+    questionImageEl.alt = 'Imagen de la pregunta';
+    questionImageEl.style.maxWidth = '100%';
+    questionImageEl.style.maxHeight = '300px';
+    questionImageEl.style.borderRadius = '8px';
+    questionImageEl.style.marginTop = '16px';
+    questionImageEl.style.display = 'block';
+    questionImageEl.style.marginLeft = 'auto';
+    questionImageEl.style.marginRight = 'auto';
+    questionText.appendChild(questionImageEl);
   }
-  
-  answers.innerHTML = '';
 
   // Crear botones de respuesta
   question.answers.forEach((answer, index) => {
     const btn = document.createElement('button');
     btn.className = 'answer';
-    
-    // CORRECCIÓN: Verificar si hay imagen o texto
-    if (answer.image_url) {
-      // Respuesta con imagen
-      btn.innerHTML = `
-        <img src="${answer.image_url}" alt="${answer.answer_text || 'Respuesta'}" style="max-width: 150px; max-height: 150px; border-radius: 8px; display: block; margin: 0 auto;">
-        ${answer.answer_text ? `<div style="margin-top: 8px; font-size: 14px;">${answer.answer_text}</div>` : ''}
-      `;
-    } else {
-      // Respuesta con texto solamente
-      btn.textContent = answer.answer_text;
-    }
-    
-    // IMPORTANTE: Resetear estado de botones
     btn.disabled = false;
     btn.style.pointerEvents = 'auto';
     
-    // CORRECCIÓN: Pasar directamente el objeto answer
-    btn.onclick = () => selectAnswer(answer, index, btn);
+    // CRÍTICO: Verificar si hay imagen_url
+    if (answer.image_url && answer.image_url.trim() !== '') {
+      // Respuesta con imagen
+      const img = document.createElement('img');
+      img.src = answer.image_url;
+      img.alt = answer.answer_text || 'Respuesta';
+      img.style.maxWidth = '150px';
+      img.style.maxHeight = '150px';
+      img.style.borderRadius = '8px';
+      img.style.display = 'block';
+      img.style.margin = '0 auto';
+      
+      btn.appendChild(img);
+      
+      // Si también hay texto, agregarlo
+      if (answer.answer_text && answer.answer_text.trim() !== '') {
+        const textDiv = document.createElement('div');
+        textDiv.textContent = answer.answer_text;
+        textDiv.style.marginTop = '8px';
+        textDiv.style.fontSize = '14px';
+        btn.appendChild(textDiv);
+      }
+    } else {
+      // Respuesta solo con texto
+      btn.textContent = answer.answer_text || `Respuesta ${index + 1}`;
+    }
     
-    // Guardar referencia del answer en el botón
+    // Guardar referencia y asignar evento
     btn.answerData = answer;
+    btn.onclick = () => selectAnswer(answer, index, btn);
     
     answers.appendChild(btn);
   });
@@ -744,7 +766,12 @@ function showQuestion() {
   updateTimer();
   timer = setInterval(tick, 100);
 }
-    function tick() {
+
+
+
+
+
+function tick() {
       timeLeft -= 0.1;
       if (timeLeft <= 0) {
         timeLeft = 0;

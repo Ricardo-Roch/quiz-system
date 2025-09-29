@@ -491,7 +491,7 @@ async def upload_image(file: UploadFile = File(...)):
 def list_images():
     """Lista todas las imágenes disponibles en el directorio static/images"""
     try:
-        # Obtener el dominio base (funciona tanto en local como en Render)
+        # Obtener el dominio base
         BASE_URL = os.getenv("BASE_URL", "https://quiz-system-sfrf.onrender.com")
         
         images = {
@@ -520,8 +520,7 @@ def list_images():
         return images
     except Exception as e:
         logger.error(f"Error listing images: {e}")
-        return {"questions": [], "answers": []}
-    
+        return {"questions": [], "answers": []} 
 @app.post("/api/test-upload")
 async def test_upload(file: UploadFile = File(...)):
     """Endpoint de prueba para diagnosticar errores de upload"""
