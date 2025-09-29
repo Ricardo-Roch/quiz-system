@@ -2009,7 +2009,7 @@ function addAnswerField(imageUrlOrText = '', isCorrect = false, isReference = fa
       textValue = imageUrlOrText;
     }
     
-    // Crear opciones del selector
+    // Crear opciones del selector DE RESPUESTAS (no preguntas)
     let imageOptions = '<option value="">Selecciona imagen</option>';
     if (availableImages && availableImages.answers && availableImages.answers.length > 0) {
       imageOptions += availableImages.answers.map(img => {
@@ -2021,14 +2021,14 @@ function addAnswerField(imageUrlOrText = '', isCorrect = false, isReference = fa
     
     answerDiv.innerHTML = `
       <div style="display: flex; gap: 12px; align-items: flex-start; margin-bottom: 12px;">
-        <div style="flex: 1;">
-          <label style="display: block; margin-bottom: 4px; font-weight: 600;">Imagen</label>
-          <select class="form-select answer-image-select">
+        <div style="flex: 2;">
+          <label style="display: block; margin-bottom: 4px; font-weight: 600;">Imagen de Respuesta</label>
+          <select class="form-select answer-image-select" required>
             ${imageOptions}
           </select>
         </div>
         <div style="flex: 1;">
-          <label style="display: block; margin-bottom: 4px; font-weight: 600;">Descripción</label>
+          <label style="display: block; margin-bottom: 4px; font-weight: 600;">Descripción (opcional)</label>
           <input type="text" class="form-input answer-text" placeholder="Texto opcional" value="${textValue}">
         </div>
         ${isReference ? '' : `
@@ -2089,7 +2089,6 @@ function addAnswerField(imageUrlOrText = '', isCorrect = false, isReference = fa
   
   container.appendChild(answerDiv);
 }
-
 
 // Modificar handleQuestionSubmit - VERSIÓN COMPLETA CORREGIDA
 async function handleQuestionSubmit(e) {
