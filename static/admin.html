@@ -1935,15 +1935,22 @@ async function uploadImage(fileInput) {
       body: formData
     });
     
+    // LOG para debugging
+    console.log('Upload response status:', response.status);
+    
     if (response.ok) {
       const data = await response.json();
+      console.log('Upload response data:', data);
       return data.image_url;
     } else {
-      throw new Error('Error al subir imagen');
+      // Intentar leer el mensaje de error del servidor
+      const errorData = await response.json().catch(() => ({}));
+      console.error('Server error:', errorData);
+      throw new Error(errorData.detail || 'Error al subir imagen');
     }
   } catch (error) {
     console.error('Error uploading image:', error);
-    alert('Error al subir imagen');
+    alert(`Error al subir imagen: ${error.message}`);
     return null;
   }
 }
