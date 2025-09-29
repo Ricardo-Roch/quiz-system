@@ -1,4 +1,3 @@
-# Version Estable
 from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
