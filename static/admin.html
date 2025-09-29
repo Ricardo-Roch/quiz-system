@@ -1045,7 +1045,7 @@ function setupEventListeners() {
   
   document.getElementById('addQuizBtn').addEventListener('click', () => openQuizModal());
   document.getElementById('addUserBtn').addEventListener('click', () => openUserModal());
-  document.getElementById('addQuestionBtn').addEventListener('click', () => openQuestionModal());
+document.getElementById('addQuestionBtn').addEventListener('click', async () => await openQuestionModal());
   document.getElementById('addAnswerBtn').addEventListener('click', addAnswerField);
   document.getElementById('quizSelect').addEventListener('change', handleQuizSelectChange);
   document.getElementById('exportBtn').addEventListener('click', exportResponses);
@@ -1793,7 +1793,7 @@ async function editQuestion(questionId) {
   try {
     const response = await fetch(`${API_BASE_URL}/api/questions/${questionId}`);
     const question = await response.json();
-    openQuestionModal(question);
+    await openQuestionModal(question); // AGREGAR await
   } catch (error) {
     console.error('Error loading question:', error);
     alert('Error al cargar pregunta');
@@ -1817,11 +1817,18 @@ async function deleteQuestion(questionId) {
   }
 }
 
-function openQuestionModal(question = null) {
+async function openQuestionModal(question = null) {
   const modal = document.getElementById('questionModal');
   const title = document.getElementById('questionModalTitle');
   const form = document.getElementById('questionForm');
   const container = document.getElementById('answersContainer');
+  
+  // ESPERAR A QUE LAS IMÁGENES ESTÉN CARGADAS
+  if (!availableImages.answers || availableImages.answers.length === 0) {
+    await loadAvailableImages();
+  }
+  
+  console.log('Available images:', availableImages); // DEBUG
   
   // Limpiar estado previo
   document.getElementById('questionQuizId').value = currentQuizId;
@@ -1830,6 +1837,8 @@ function openQuestionModal(question = null) {
   answerCount = 0;
   
   if (question) {
+    console.log('Editing question:', question); // DEBUG
+    
     // MODO EDICIÓN
     title.textContent = 'Editar Pregunta';
     document.getElementById('questionId').value = question.id;
@@ -1838,13 +1847,15 @@ function openQuestionModal(question = null) {
     document.getElementById('questionTimeLimit').value = question.time_limit;
     document.getElementById('questionType').value = question.question_type || 'multiple_choice';
     
-    // Ajustar interfaz según tipo SIN recrear respuestas
+    // Ajustar interfaz según tipo
     const questionType = question.question_type || 'multiple_choice';
     const imageGroup = document.getElementById('questionImageGroup');
     
     if (questionType === 'image_choice') {
       imageGroup.style.display = 'block';
       const questionImageSelect = document.getElementById('questionImageSelect');
+      
+      // Poblar selector de imagen de pregunta
       questionImageSelect.innerHTML = '<option value="">Sin imagen</option>' +
         availableImages.questions.map(img => 
           `<option value="${img}">${img.split('/').pop()}</option>`
@@ -1865,6 +1876,8 @@ function openQuestionModal(question = null) {
     
     // Cargar respuestas según el tipo
     question.answers.forEach((answer) => {
+      console.log('Loading answer:', answer); // DEBUG
+      
       if (questionType === 'image_choice') {
         addAnswerField(answer.image_url || '', answer.is_correct);
         const lastDiv = container.lastElementChild;
@@ -1893,6 +1906,7 @@ function openQuestionModal(question = null) {
   
   modal.classList.add('show');
 }
+
 
 //de aquii ------------------------------------------------------------------------------------------------------------------------------------
 function removeAnswerField(button) {
