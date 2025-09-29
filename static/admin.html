@@ -1004,13 +1004,30 @@ const loginError = document.getElementById('loginError');
 const navLinks = document.querySelectorAll('.nav-link');
 const pages = document.querySelectorAll('.page');
 
-// Initialize
+// Al inicio del script, agregar variable global
+let availableImages = { questions: [], answers: [] };
+
+// Agregar función para cargar imágenes disponibles
+async function loadAvailableImages() {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/images`);
+    if (response.ok) {
+      availableImages = await response.json();
+    }
+  } catch (error) {
+    console.error('Error loading images:', error);
+  }
+}
+
+// Llamar al cargar el panel
 document.addEventListener('DOMContentLoaded', function() {
   if (sessionStorage.getItem('adminLoggedIn') === 'true') {
     showAdminPanel();
+    loadAvailableImages(); // AGREGAR ESTA LÍNEA
   }
   setupEventListeners();
 });
+
 
 function setupEventListeners() {
   loginForm.addEventListener('submit', handleLogin);
@@ -1863,24 +1880,32 @@ function handleQuestionTypeChange() {
   // Mostrar/ocultar campo de imagen
   if (questionType === 'image_choice') {
     imageGroup.style.display = 'block';
+    // Crear selector dinámico
+    imageGroup.innerHTML = `
+      <label class="form-label">Imagen de la Pregunta</label>
+      <select id="questionImageSelect" class="form-select">
+        <option value="">Sin imagen</option>
+        ${availableImages.questions.map(img => 
+          `<option value="${img}">${img.split('/').pop()}</option>`
+        ).join('')}
+      </select>
+      <div id="questionImagePreview" style="margin-top: 10px;"></div>
+    `;
+    
+    // Preview al seleccionar
+    document.getElementById('questionImageSelect').addEventListener('change', (e) => {
+      const preview = document.getElementById('questionImagePreview');
+      if (e.target.value) {
+        preview.innerHTML = `<img src="${e.target.value}" style="max-width: 200px; border-radius: 8px;">`;
+      } else {
+        preview.innerHTML = '';
+      }
+    });
   } else {
     imageGroup.style.display = 'none';
   }
   
-  // Limpiar respuestas y recrear según tipo
-  answersContainer.innerHTML = '';
-  answerCount = 0;
-  
-  if (questionType === 'open_ended') {
-    // Para preguntas abiertas, agregar un campo de referencia
-    addAnswerField('Respuesta de referencia (opcional)', false, true);
-    document.querySelector('input[name="correctAnswer"]').style.display = 'none';
-  } else {
-    // Para otros tipos, comportamiento normal
-    for (let i = 0; i < 4; i++) {
-      addAnswerField();
-    }
-  }
+  // Resto del código igual...
 }
 
 // Modificar función addAnswerField
@@ -1897,14 +1922,17 @@ function addAnswerField(text = '', isCorrect = false, isReference = false) {
   answerDiv.dataset.answerIndex = answerCount;
   
   let inputField = '';
-  if (questionType === 'image_choice') {
-    inputField = `
-      <input type="file" class="form-input answer-image" accept="image/*">
-      <input type="text" class="form-input answer-text" placeholder="Descripción (opcional)" value="${text}">
-    `;
-  } else {
-    inputField = `<input type="text" class="form-input answer-text" placeholder="Respuesta ${answerCount}" value="${text}" required>`;
-  }
+if (questionType === 'image_choice') {
+  inputField = `
+    <select class="form-select answer-image-select" style="flex: 1;">
+      <option value="">Selecciona imagen</option>
+      ${availableImages.answers.map(img => 
+        `<option value="${img}">${img.split('/').pop()}</option>`
+      ).join('')}
+    </select>
+    <input type="text" class="form-input answer-text" placeholder="Descripción" value="${text}" style="flex: 1;">
+  `;
+}
   
   const correctRadio = isReference ? '' : `
     <label style="display: flex; align-items: center; gap: 4px; white-space: nowrap;">
@@ -1963,11 +1991,22 @@ async function handleQuestionSubmit(e) {
   const questionType = document.getElementById('questionType').value;
   
   // Subir imagen de pregunta si existe
-  let questionImageUrl = null;
-  const questionImageFile = document.getElementById('questionImageFile');
-  if (questionImageFile && questionImageFile.files[0]) {
-    questionImageUrl = await uploadImage(questionImageFile);
-  }
+ // Cambiar esta parte:
+let questionImageUrl = null;
+const questionImageSelect = document.getElementById('questionImageSelect');
+if (questionImageSelect) {
+  questionImageUrl = questionImageSelect.value || null;
+}
+
+// Para las respuestas de imagen:
+if (questionType === 'image_choice') {
+  const imageSelect = div.querySelector('.answer-image-select');
+  const textInput = div.querySelector('.answer-text');
+  
+  imageUrl = imageSelect ? imageSelect.value : null;
+  answerText = textInput ? textInput.value : null;
+  // ...
+}
   
   // Procesar respuestas según tipo
   const answers = [];

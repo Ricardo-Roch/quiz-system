@@ -487,6 +487,32 @@ async def upload_image(file: UploadFile = File(...)):
         logger.error(f"Error uploading image: {e}")
         raise HTTPException(status_code=500, detail=f"Error al subir imagen: {str(e)}")
     
+@app.get("/api/images")
+def list_images():
+    """Lista todas las imágenes disponibles en el directorio static/images"""
+    try:
+        images = {
+            "questions": [],
+            "answers": []
+        }
+        
+        # Listar imágenes de preguntas
+        questions_dir = "static/images/questions"
+        if os.path.exists(questions_dir):
+            images["questions"] = [f"/static/images/questions/{f}" for f in os.listdir(questions_dir) 
+                                   if f.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp'))]
+        
+        # Listar imágenes de respuestas  
+        answers_dir = "static/images/answers"
+        if os.path.exists(answers_dir):
+            images["answers"] = [f"/static/images/answers/{f}" for f in os.listdir(answers_dir)
+                                 if f.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp'))]
+        
+        return images
+    except Exception as e:
+        logger.error(f"Error listing images: {e}")
+        return {"questions": [], "answers": []}
+    
 @app.post("/api/test-upload")
 async def test_upload(file: UploadFile = File(...)):
     """Endpoint de prueba para diagnosticar errores de upload"""
