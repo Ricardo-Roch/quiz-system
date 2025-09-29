@@ -822,13 +822,18 @@ def update_question(question_id: int, question_update: QuestionUpdate, db: Sessi
             question.question_order = question_update.question_order
         if question_update.time_limit is not None:
             question.time_limit = question_update.time_limit
+        if question_update.question_type is not None:
+            question.question_type = question_update.question_type
+        if question_update.image_url is not None:
+            question.image_url = question_update.image_url
         
         # Actualizar respuestas si se envían
         if question_update.answers is not None:
-            # Validar al menos una correcta
-            correct_answers = [a for a in question_update.answers if a.is_correct]
-            if len(correct_answers) < 1:
-                raise HTTPException(status_code=400, detail="Debe haber al menos una respuesta correcta")
+            # Validar según tipo de pregunta
+            if question_update.question_type != QuestionType.OPEN_ENDED:
+                correct_answers = [a for a in question_update.answers if a.is_correct]
+                if len(correct_answers) < 1:
+                    raise HTTPException(status_code=400, detail="Debe haber al menos una respuesta correcta")
             
             # Eliminar respuestas viejas
             db.query(Answer).filter(Answer.question_id == question_id).delete(synchronize_session=False)
@@ -839,12 +844,14 @@ def update_question(question_id: int, question_update: QuestionUpdate, db: Sessi
                 db_answer = Answer(
                     question_id=question_id,
                     answer_text=answer.answer_text,
+                    image_url=answer.image_url,
                     is_correct=answer.is_correct,
                     answer_order=answer.answer_order
                 )
                 db.add(db_answer)
         
         db.commit()
+        db.refresh(question)
         return {"message": "Pregunta actualizada exitosamente", "question_id": question_id}
         
     except HTTPException:
@@ -853,7 +860,8 @@ def update_question(question_id: int, question_update: QuestionUpdate, db: Sessi
         db.rollback()
         logger.error(f"Error updating question: {e}")
         raise HTTPException(status_code=500, detail="Error al actualizar pregunta")
-
+    
+    
 
 @app.delete("/api/questions/{question_id}")
 def delete_question(question_id: int, db: Session = Depends(get_db)):
