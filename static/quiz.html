@@ -705,7 +705,7 @@ function showQuestion() {
   questionText.appendChild(textEl);
   
   // Imagen de la pregunta (si existe)
-  if (question.image_url) {
+  if (question.image_url && question.image_url.trim() !== '') {
     const img = document.createElement('img');
     img.src = question.image_url;
     img.alt = 'Imagen de la pregunta';
@@ -722,66 +722,78 @@ function showQuestion() {
     questionText.appendChild(img);
   }
 
-  // Crear botones de respuesta
-  question.answers.forEach((answer, index) => {
-    const btn = document.createElement('button');
-    btn.className = 'answer';
-    btn.disabled = false;
-    btn.style.pointerEvents = 'auto';
-    btn.style.minHeight = '80px';
-    btn.style.display = 'flex';
-    btn.style.flexDirection = 'column';
-    btn.style.alignItems = 'center';
-    btn.style.justifyContent = 'center';
-    btn.style.gap = '8px';
-    
-    console.log(`Respuesta ${index + 1}:`, {
-      text: answer.answer_text,
-      image: answer.image_url
-    });
-    
-    // Si hay imagen
-    if (answer.image_url && answer.image_url.trim() !== '') {
-      const img = document.createElement('img');
-      img.src = answer.image_url;
-      img.alt = answer.answer_text || `Respuesta ${index + 1}`;
-      img.style.maxWidth = '120px';
-      img.style.maxHeight = '120px';
-      img.style.borderRadius = '8px';
-      img.style.objectFit = 'contain';
-      img.onerror = () => {
-        console.error('Error cargando imagen:', answer.image_url);
-        img.alt = '❌ Error cargando imagen';
-        img.style.display = 'none';
-        btn.textContent = answer.answer_text || `Respuesta ${index + 1}`;
-      };
-      btn.appendChild(img);
+  // Crear botones de respuesta según el tipo
+  if (question.question_type === 'image_choice') {
+    // RESPUESTAS CON IMAGEN
+    question.answers.forEach((answer, index) => {
+      const btn = document.createElement('button');
+      btn.className = 'answer';
+      btn.disabled = false;
+      btn.style.pointerEvents = 'auto';
+      btn.style.minHeight = '140px';
+      btn.style.display = 'flex';
+      btn.style.flexDirection = 'column';
+      btn.style.alignItems = 'center';
+      btn.style.justifyContent = 'center';
+      btn.style.gap = '8px';
+      btn.style.padding = '16px';
       
-      // Texto descriptivo (opcional)
-      if (answer.answer_text && answer.answer_text.trim() !== '') {
-        const text = document.createElement('div');
-        text.textContent = answer.answer_text;
-        text.style.fontSize = '13px';
-        text.style.fontWeight = '600';
-        btn.appendChild(text);
+      if (answer.image_url && answer.image_url.trim() !== '') {
+        const img = document.createElement('img');
+        img.src = answer.image_url;
+        img.alt = answer.answer_text || `Respuesta ${index + 1}`;
+        img.style.maxWidth = '100%';
+        img.style.maxHeight = '100px';
+        img.style.borderRadius = '8px';
+        img.style.objectFit = 'contain';
+        img.onerror = () => {
+          console.error('Error cargando imagen de respuesta:', answer.image_url);
+          img.style.display = 'none';
+          btn.textContent = answer.answer_text || `Respuesta ${index + 1}`;
+        };
+        btn.appendChild(img);
+        
+        // Texto descriptivo opcional
+        if (answer.answer_text && answer.answer_text.trim() !== '') {
+          const text = document.createElement('div');
+          text.textContent = answer.answer_text;
+          text.style.fontSize = '13px';
+          text.style.fontWeight = '600';
+          text.style.marginTop = '8px';
+          btn.appendChild(text);
+        }
+      } else {
+        // Solo texto si no hay imagen
+        btn.textContent = answer.answer_text || `Respuesta ${index + 1}`;
       }
-    } else {
-      // Solo texto
+      
+      btn.answerData = answer;
+      btn.onclick = () => selectAnswer(answer, index, btn);
+      
+      answers.appendChild(btn);
+    });
+  } else {
+    // RESPUESTAS DE TEXTO (multiple_choice y open_ended)
+    question.answers.forEach((answer, index) => {
+      const btn = document.createElement('button');
+      btn.className = 'answer';
+      btn.disabled = false;
+      btn.style.pointerEvents = 'auto';
+      btn.style.minHeight = '80px';
       btn.textContent = answer.answer_text || `Respuesta ${index + 1}`;
-    }
-    
-    btn.answerData = answer;
-    btn.onclick = () => selectAnswer(answer, index, btn);
-    
-    answers.appendChild(btn);
-  });
+      
+      btn.answerData = answer;
+      btn.onclick = () => selectAnswer(answer, index, btn);
+      
+      answers.appendChild(btn);
+    });
+  }
 
   // Timer
   timeLeft = question.time_limit || TIME_PER_QUESTION;
   updateTimer();
   timer = setInterval(tick, 100);
 }
-
 
 
 
