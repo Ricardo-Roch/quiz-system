@@ -1,3 +1,4 @@
+# Version Estable
 from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -468,6 +469,36 @@ async def upload_image(file: UploadFile = File(...)):
     except Exception as e:
         logger.error(f"Error uploading image: {e}")
         raise HTTPException(status_code=500, detail="Error al subir imagen")
+    
+import os
+
+@app.get("/api/debug/files")
+def debug_files():
+    """Endpoint para verificar archivos en el servidor"""
+    try:
+        static_dir = "static/images"
+        
+        # Verificar si existe el directorio
+        dir_exists = os.path.exists(static_dir)
+        
+        # Listar archivos si existe
+        files = []
+        if dir_exists:
+            files = os.listdir(static_dir)
+        
+        # Verificar permisos
+        can_write = os.access("static", os.W_OK) if os.path.exists("static") else False
+        
+        return {
+            "directory_exists": dir_exists,
+            "can_write": can_write,
+            "files_count": len(files),
+            "files": files[:10],  # Primeros 10 archivos
+            "current_working_directory": os.getcwd(),
+            "static_path": os.path.abspath(static_dir) if dir_exists else None
+        }
+    except Exception as e:
+        return {"error": str(e)}
     
 @app.get("/api/quizzes/", response_model=List[QuizOut])
 def get_quizzes(active_only: bool = False, db: Session = Depends(get_db)):
