@@ -933,56 +933,59 @@
   </div>
 
   <!-- Question Modal -->
-  <div id="questionModal" class="modal">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2 class="modal-title" id="questionModalTitle">Agregar Pregunta</h2>
-        <button class="close-btn" onclick="closeModal('questionModal')">&times;</button>
+<div id="questionModal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2 class="modal-title" id="questionModalTitle">Agregar Pregunta</h2>
+      <button class="close-btn" onclick="closeModal('questionModal')">&times;</button>
+    </div>
+    <form id="questionForm">
+      <input type="hidden" id="questionQuizId">
+      <input type="hidden" id="questionId">
+      
+      <div class="form-group">
+        <label class="form-label">Pregunta</label>
+        <textarea id="questionText" class="form-textarea" required></textarea>
       </div>
-      <form id="questionForm">
-        <input type="hidden" id="questionQuizId">
-        <input type="hidden" id="questionId">
-        <div class="form-group">
-          <label class="form-label">Pregunta</label>
-          <textarea id="questionText" class="form-textarea" required></textarea>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Orden</label>
-          <input type="number" id="questionOrder" class="form-input" min="1" required>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Tiempo límite (segundos)</label>
-          <input type="number" id="questionTimeLimit" class="form-input" min="10" value="30" required>
-        </div>
-                <!-- En el modal questionModal, agregar campos para tipo y imagen -->
-        <div class="form-group">
+      
+      <div class="form-group">
+        <label class="form-label">Orden</label>
+        <input type="number" id="questionOrder" class="form-input" min="1" required>
+      </div>
+      
+      <div class="form-group">
+        <label class="form-label">Tiempo límite (segundos)</label>
+        <input type="number" id="questionTimeLimit" class="form-input" min="10" value="30" required>
+      </div>
+      
+      <div class="form-group">
         <label class="form-label">Tipo de Pregunta</label>
         <select id="questionType" class="form-select">
-            <option value="multiple_choice">Opción Múltiple</option>
-            <option value="open_ended">Respuesta Abierta</option>
-            <option value="image_choice">Selección de Imagen</option>
+          <option value="multiple_choice">Opción Múltiple</option>
+          <option value="open_ended">Respuesta Abierta</option>
+          <option value="image_choice">Selección de Imagen</option>
         </select>
-        </div>
+      </div>
 
-        <div class="form-group" id="questionImageGroup" style="display:none;">
+      <div class="form-group" id="questionImageGroup" style="display:none;">
         <label class="form-label">Imagen de la Pregunta</label>
-        <input type="file" id="questionImageFile" class="form-input" accept="image/*">
-        <div id="questionImagePreview" style="margin-top: 10px;"></div>
-        </div>
-        
-        <h4>Respuestas</h4>
-        <div id="answersContainer">
-          <!-- Answers will be added dynamically -->
-        </div>
-        <button type="button" class="btn btn-success btn-small" id="addAnswerBtn">Agregar Respuesta</button>
-        
-        <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px;">
-          <button type="button" class="btn" onclick="closeModal('questionModal')">Cancelar</button>
-          <button type="submit" class="btn btn-primary">Guardar</button>
-        </div>
-      </form>
-    </div>
+        <select id="questionImageSelect" class="form-select">
+          <option value="">Sin imagen</option>
+        </select>
+        <div id="questionImagePreview" style="margin-top: 10px; text-align: center;"></div>
+      </div>
+      
+      <h4>Respuestas</h4>
+      <div id="answersContainer"></div>
+      <button type="button" class="btn btn-success btn-small" id="addAnswerBtn">Agregar Respuesta</button>
+      
+      <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px;">
+        <button type="button" class="btn" onclick="closeModal('questionModal')">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Guardar</button>
+      </div>
+    </form>
   </div>
+</div>
 
   <script>
  // API Configuration
@@ -1898,25 +1901,21 @@ function handleQuestionTypeChange() {
   const imageGroup = document.getElementById('questionImageGroup');
   const answersContainer = document.getElementById('answersContainer');
   
-  // Mostrar/ocultar campo de imagen de pregunta
+  // Mostrar/ocultar campo de imagen
   if (questionType === 'image_choice') {
     imageGroup.style.display = 'block';
-    imageGroup.innerHTML = `
-      <label class="form-label">Imagen de la Pregunta</label>
-      <select id="questionImageSelect" class="form-select">
-        <option value="">Sin imagen</option>
-        ${availableImages.questions.map(img => 
-          `<option value="${img}">${img.split('/').pop()}</option>`
-        ).join('')}
-      </select>
-      <div id="questionImagePreview" style="margin-top: 10px;"></div>
-    `;
     
-    // Preview al seleccionar
-    document.getElementById('questionImageSelect').addEventListener('change', (e) => {
+    const questionImageSelect = document.getElementById('questionImageSelect');
+    questionImageSelect.innerHTML = '<option value="">Sin imagen</option>' +
+      availableImages.questions.map(img => 
+        `<option value="${img}">${img.split('/').pop()}</option>`
+      ).join('');
+    
+    // Preview de imagen de pregunta
+    questionImageSelect.addEventListener('change', (e) => {
       const preview = document.getElementById('questionImagePreview');
       if (e.target.value) {
-        preview.innerHTML = `<img src="${e.target.value}" style="max-width: 200px; border-radius: 8px;">`;
+        preview.innerHTML = `<img src="${e.target.value}" style="max-width: 300px; border-radius: 8px; border: 2px solid #3b82f6;">`;
       } else {
         preview.innerHTML = '';
       }
@@ -1925,77 +1924,104 @@ function handleQuestionTypeChange() {
     imageGroup.style.display = 'none';
   }
   
-  // Limpiar respuestas y recrear según tipo
+  // Recrear respuestas
   answersContainer.innerHTML = '';
   answerCount = 0;
   
   if (questionType === 'open_ended') {
-    // Para preguntas abiertas: una sola respuesta de referencia
-    addAnswerField('Respuesta de referencia (opcional)', false, true);
+    addAnswerField('', false, true);
   } else {
-    // Para otros tipos: 4 respuestas por defecto
     for (let i = 0; i < 4; i++) {
       addAnswerField();
     }
   }
 }
-// Modificar función addAnswerField
-function addAnswerField(textOrUrl = '', isCorrect = false, isReference = false) {
+function addAnswerField(imageUrlOrText = '', isCorrect = false, isReference = false) {
   answerCount++;
   const container = document.getElementById('answersContainer');
   const questionType = document.getElementById('questionType').value;
   
   const answerDiv = document.createElement('div');
   answerDiv.className = 'form-group';
-  answerDiv.style.display = 'flex';
-  answerDiv.style.gap = '12px';
-  answerDiv.style.alignItems = 'center';
+  answerDiv.style.padding = '16px';
+  answerDiv.style.border = '1px solid var(--border)';
+  answerDiv.style.borderRadius = '8px';
+  answerDiv.style.marginBottom = '12px';
   answerDiv.dataset.answerIndex = answerCount;
   
-  let inputField = '';
-  
   if (questionType === 'image_choice') {
-    // Selector de imagen
-    let selectedUrl = '';
+    // Para respuestas con imagen
+    let selectedImage = '';
     let textValue = '';
     
-    // Si textOrUrl es una URL (contiene http), es una imagen
-    if (textOrUrl && textOrUrl.includes('http')) {
-      selectedUrl = textOrUrl;
+    if (imageUrlOrText && imageUrlOrText.includes('http')) {
+      selectedImage = imageUrlOrText;
     } else {
-      textValue = textOrUrl;
+      textValue = imageUrlOrText;
     }
     
-    inputField = `
-      <select class="form-select answer-image-select" style="flex: 1;">
-        <option value="">Selecciona imagen</option>
-        ${availableImages.answers.map(img => {
-          const fileName = img.split('/').pop();
-          const selected = img === selectedUrl ? 'selected' : '';
-          return `<option value="${img}" ${selected}>${fileName}</option>`;
-        }).join('')}
-      </select>
-      <input type="text" class="form-input answer-text" placeholder="Descripción" value="${textValue}" style="flex: 1;">
+    answerDiv.innerHTML = `
+      <div style="display: flex; gap: 12px; align-items: flex-start; margin-bottom: 12px;">
+        <div style="flex: 1;">
+          <label style="display: block; margin-bottom: 4px; font-weight: 600;">Imagen</label>
+          <select class="form-select answer-image-select">
+            <option value="">Selecciona imagen</option>
+            ${availableImages.answers.map(img => {
+              const fileName = img.split('/').pop();
+              const selected = img === selectedImage ? 'selected' : '';
+              return `<option value="${img}" ${selected}>${fileName}</option>`;
+            }).join('')}
+          </select>
+        </div>
+        <div style="flex: 1;">
+          <label style="display: block; margin-bottom: 4px; font-weight: 600;">Descripción</label>
+          <input type="text" class="form-input answer-text" placeholder="Texto opcional" value="${textValue}">
+        </div>
+        ${isReference ? '' : `
+        <label style="display: flex; align-items: center; gap: 4px; margin-top: 28px;">
+          <input type="radio" name="correctAnswer" value="${answerCount}" ${isCorrect ? 'checked' : ''}>
+          Correcta
+        </label>
+        <button type="button" class="btn btn-danger btn-small" onclick="removeAnswerField(this)" style="margin-top: 28px;">×</button>
+        `}
+      </div>
+      <div class="answer-image-preview" style="text-align: center; min-height: 50px;"></div>
     `;
+    
+    // Preview de imagen al cambiar
+    const select = answerDiv.querySelector('.answer-image-select');
+    const preview = answerDiv.querySelector('.answer-image-preview');
+    
+    if (selectedImage) {
+      preview.innerHTML = `<img src="${selectedImage}" style="max-width: 200px; max-height: 200px; border-radius: 8px; border: 2px solid #10b981;">`;
+    }
+    
+    select.addEventListener('change', (e) => {
+      if (e.target.value) {
+        preview.innerHTML = `<img src="${e.target.value}" style="max-width: 200px; max-height: 200px; border-radius: 8px; border: 2px solid #10b981;">`;
+      } else {
+        preview.innerHTML = '<p style="color: #94a3b8;">Sin imagen seleccionada</p>';
+      }
+    });
+    
   } else {
-    inputField = `<input type="text" class="form-input answer-text" placeholder="Respuesta ${answerCount}" value="${textOrUrl}" required style="flex: 1;">`;
+    // Para respuestas de texto
+    answerDiv.innerHTML = `
+      <div style="display: flex; gap: 12px; align-items: center;">
+        <input type="text" class="form-input answer-text" placeholder="Respuesta ${answerCount}" value="${imageUrlOrText}" required style="flex: 1;">
+        ${isReference ? '' : `
+        <label style="display: flex; align-items: center; gap: 4px;">
+          <input type="radio" name="correctAnswer" value="${answerCount}" ${isCorrect ? 'checked' : ''}>
+          Correcta
+        </label>
+        <button type="button" class="btn btn-danger btn-small" onclick="removeAnswerField(this)">×</button>
+        `}
+      </div>
+    `;
   }
   
-  const correctRadio = isReference ? '' : `
-    <label style="display: flex; align-items: center; gap: 4px;">
-      <input type="radio" name="correctAnswer" value="${answerCount}" ${isCorrect ? 'checked' : ''}>
-      Correcta
-    </label>
-  `;
-  
-  const removeButton = isReference ? '' : `
-    <button type="button" class="btn btn-danger btn-small" onclick="removeAnswerField(this)">×</button>
-  `;
-  
-  answerDiv.innerHTML = inputField + correctRadio + removeButton;
   container.appendChild(answerDiv);
 }
-// Modificar handleQuestionSubmit
 // Modificar handleQuestionSubmit - VERSIÓN COMPLETA CORREGIDA
 async function handleQuestionSubmit(e) {
   e.preventDefault();

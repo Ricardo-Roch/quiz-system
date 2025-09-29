@@ -695,29 +695,31 @@ function showQuestion() {
   const question = questions[currentQuestionIndex];
   
   qIndex.textContent = currentQuestionIndex + 1;
-  
-  // IMPORTANTE: Limpiar el contenido anterior
   questionText.innerHTML = '';
   answers.innerHTML = '';
   
-  // Mostrar texto de la pregunta
-  const questionTextEl = document.createElement('div');
-  questionTextEl.textContent = question.question_text;
-  questionText.appendChild(questionTextEl);
+  // Texto de la pregunta
+  const textEl = document.createElement('div');
+  textEl.textContent = question.question_text;
+  textEl.style.marginBottom = '16px';
+  questionText.appendChild(textEl);
   
-  // Mostrar imagen de la pregunta si existe
+  // Imagen de la pregunta (si existe)
   if (question.image_url) {
-    const questionImageEl = document.createElement('img');
-    questionImageEl.src = question.image_url;
-    questionImageEl.alt = 'Imagen de la pregunta';
-    questionImageEl.style.maxWidth = '100%';
-    questionImageEl.style.maxHeight = '300px';
-    questionImageEl.style.borderRadius = '8px';
-    questionImageEl.style.marginTop = '16px';
-    questionImageEl.style.display = 'block';
-    questionImageEl.style.marginLeft = 'auto';
-    questionImageEl.style.marginRight = 'auto';
-    questionText.appendChild(questionImageEl);
+    const img = document.createElement('img');
+    img.src = question.image_url;
+    img.alt = 'Imagen de la pregunta';
+    img.style.maxWidth = '100%';
+    img.style.maxHeight = '300px';
+    img.style.borderRadius = '12px';
+    img.style.display = 'block';
+    img.style.margin = '16px auto';
+    img.style.border = '3px solid var(--primary-blue)';
+    img.onerror = () => {
+      console.error('Error cargando imagen de pregunta:', question.image_url);
+      img.style.display = 'none';
+    };
+    questionText.appendChild(img);
   }
 
   // Crear botones de respuesta
@@ -726,47 +728,59 @@ function showQuestion() {
     btn.className = 'answer';
     btn.disabled = false;
     btn.style.pointerEvents = 'auto';
+    btn.style.minHeight = '80px';
+    btn.style.display = 'flex';
+    btn.style.flexDirection = 'column';
+    btn.style.alignItems = 'center';
+    btn.style.justifyContent = 'center';
+    btn.style.gap = '8px';
     
-    // CRÍTICO: Verificar si hay imagen_url
+    console.log(`Respuesta ${index + 1}:`, {
+      text: answer.answer_text,
+      image: answer.image_url
+    });
+    
+    // Si hay imagen
     if (answer.image_url && answer.image_url.trim() !== '') {
-      // Respuesta con imagen
       const img = document.createElement('img');
       img.src = answer.image_url;
-      img.alt = answer.answer_text || 'Respuesta';
-      img.style.maxWidth = '150px';
-      img.style.maxHeight = '150px';
+      img.alt = answer.answer_text || `Respuesta ${index + 1}`;
+      img.style.maxWidth = '120px';
+      img.style.maxHeight = '120px';
       img.style.borderRadius = '8px';
-      img.style.display = 'block';
-      img.style.margin = '0 auto';
-      
+      img.style.objectFit = 'contain';
+      img.onerror = () => {
+        console.error('Error cargando imagen:', answer.image_url);
+        img.alt = '❌ Error cargando imagen';
+        img.style.display = 'none';
+        btn.textContent = answer.answer_text || `Respuesta ${index + 1}`;
+      };
       btn.appendChild(img);
       
-      // Si también hay texto, agregarlo
+      // Texto descriptivo (opcional)
       if (answer.answer_text && answer.answer_text.trim() !== '') {
-        const textDiv = document.createElement('div');
-        textDiv.textContent = answer.answer_text;
-        textDiv.style.marginTop = '8px';
-        textDiv.style.fontSize = '14px';
-        btn.appendChild(textDiv);
+        const text = document.createElement('div');
+        text.textContent = answer.answer_text;
+        text.style.fontSize = '13px';
+        text.style.fontWeight = '600';
+        btn.appendChild(text);
       }
     } else {
-      // Respuesta solo con texto
+      // Solo texto
       btn.textContent = answer.answer_text || `Respuesta ${index + 1}`;
     }
     
-    // Guardar referencia y asignar evento
     btn.answerData = answer;
     btn.onclick = () => selectAnswer(answer, index, btn);
     
     answers.appendChild(btn);
   });
 
-  // Iniciar timer
+  // Timer
   timeLeft = question.time_limit || TIME_PER_QUESTION;
   updateTimer();
   timer = setInterval(tick, 100);
 }
-
 
 
 
