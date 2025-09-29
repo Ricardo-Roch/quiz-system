@@ -2069,7 +2069,7 @@ function addAnswerField(imageUrlOrText = '', isCorrect = false, isReference = fa
         </div>
         ${isReference ? '' : `
         <label style="display: flex; align-items: center; gap: 4px; margin-top: 28px;">
-          <input type="radio" name="correctAnswer" value="${answerCount}" ${isCorrect ? 'checked' : ''}>
+          <input type="checkbox" class="answer-correct-check" ${isCorrect ? 'checked' : ''}>
           Correcta
         </label>
         <button type="button" class="btn btn-danger btn-small" onclick="removeAnswerField(this)" style="margin-top: 28px;">×</button>
@@ -2110,7 +2110,7 @@ function addAnswerField(imageUrlOrText = '', isCorrect = false, isReference = fa
       </div>
     `;
   } else {
-    // RESPUESTAS DE TEXTO (OPCIÓN MÚLTIPLE)
+    // RESPUESTAS DE TEXTO (OPCIÓN MÚLTIPLE) - USAR CHECKBOXES
     const safeText = imageUrlOrText && typeof imageUrlOrText === 'string' ? imageUrlOrText : '';
     
     answerDiv.innerHTML = `
@@ -2118,7 +2118,7 @@ function addAnswerField(imageUrlOrText = '', isCorrect = false, isReference = fa
         <input type="text" class="form-input answer-text" placeholder="Respuesta ${answerCount}" value="${safeText}" required style="flex: 1;">
         ${isReference ? '' : `
         <label style="display: flex; align-items: center; gap: 4px;">
-          <input type="radio" name="correctAnswer" value="${answerCount}" ${isCorrect ? 'checked' : ''}>
+          <input type="checkbox" class="answer-correct-check" ${isCorrect ? 'checked' : ''}>
           Correcta
         </label>
         <button type="button" class="btn btn-danger btn-small" onclick="removeAnswerField(this)">×</button>
@@ -2129,6 +2129,7 @@ function addAnswerField(imageUrlOrText = '', isCorrect = false, isReference = fa
   
   container.appendChild(answerDiv);
 }
+
 
 // Modificar handleQuestionSubmit - VERSIÓN COMPLETA CORREGIDA
 async function handleQuestionSubmit(e) {
@@ -2152,7 +2153,6 @@ async function handleQuestionSubmit(e) {
   
   for (let i = 0; i < answerDivs.length; i++) {
     const div = answerDivs[i];
-    const answerIndex = parseInt(div.dataset.answerIndex);
     
     let answerText = null;
     let imageUrl = null;
@@ -2161,6 +2161,7 @@ async function handleQuestionSubmit(e) {
     if (questionType === 'image_choice') {
       const imageSelect = div.querySelector('.answer-image-select');
       const textInput = div.querySelector('.answer-text');
+      const correctCheck = div.querySelector('.answer-correct-check');
       
       if (imageSelect) {
         imageUrl = imageSelect.value || null;
@@ -2171,8 +2172,9 @@ async function handleQuestionSubmit(e) {
         answerText = textInput.value || null;
       }
       
-      const correctRadio = div.querySelector(`input[name="correctAnswer"][value="${answerIndex}"]`);
-      isCorrect = correctRadio ? correctRadio.checked : false;
+      if (correctCheck) {
+        isCorrect = correctCheck.checked;
+      }
       
     } else {
       const textInput = div.querySelector('.answer-text');
@@ -2181,8 +2183,10 @@ async function handleQuestionSubmit(e) {
       }
       
       if (questionType !== 'open_ended') {
-        const correctRadio = div.querySelector(`input[name="correctAnswer"][value="${answerIndex}"]`);
-        isCorrect = correctRadio ? correctRadio.checked : false;
+        const correctCheck = div.querySelector('.answer-correct-check');
+        if (correctCheck) {
+          isCorrect = correctCheck.checked;
+        }
       }
     }
     
