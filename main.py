@@ -17,6 +17,8 @@ import logging
 from enum import Enum
 import shutil
 import uuid
+import requests
+import base64
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -449,28 +451,42 @@ async def upload_image(file: UploadFile = File(...)):
         if not file.content_type.startswith('image/'):
             raise HTTPException(status_code=400, detail="Solo se permiten archivos de imagen")
         
-        # Crear directorio si no existe
-        upload_dir = "static/images"
-        os.makedirs(upload_dir, exist_ok=True)
+        # Leer archivo y convertir a base64
+        contents = await file.read()
+        b64_image = base64.b64encode(contents).decode('utf-8')
         
-        # Generar nombre único
-        file_extension = file.filename.split('.')[-1]
-        unique_filename = f"{int(datetime.utcnow().timestamp())}_{uuid.uuid4().hex[:8]}.{file_extension}"
-        file_path = os.path.join(upload_dir, unique_filename)
+        # Subir a Imgur usando API pública
+        headers = {"Authorization": "Client-ID 546c25a59c58ad7"}
+        data = {"image": b64_image, "type": "base64"}
         
-        # Guardar archivo
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+        response = requests.post(
+            "https://api.imgur.com/3/image",
+            headers=headers,
+            data=data,
+            timeout=30
+        )
         
-        # Retornar URL relativa
-        image_url = f"/static/images/{unique_filename}"
-        return {"image_url": image_url, "filename": unique_filename}
-        
+        if response.status_code == 200:
+            result = response.json()
+            image_url = result['data']['link']
+            
+            logger.info(f"Image uploaded successfully: {image_url}")
+            
+            return {
+                "image_url": image_url,
+                "filename": result['data']['id']
+            }
+        else:
+            logger.error(f"Imgur error: {response.status_code} - {response.text}")
+            raise HTTPException(status_code=500, detail="Error al subir imagen a Imgur")
+            
+    except requests.exceptions.Timeout:
+        logger.error("Timeout uploading to Imgur")
+        raise HTTPException(status_code=504, detail="Timeout al subir imagen")
     except Exception as e:
         logger.error(f"Error uploading image: {e}")
-        raise HTTPException(status_code=500, detail="Error al subir imagen")
+        raise HTTPException(status_code=500, detail=f"Error al subir imagen: {str(e)}")
     
-import os
 
 @app.get("/api/debug/files")
 def debug_files():

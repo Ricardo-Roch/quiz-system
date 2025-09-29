@@ -6,3 +6,4 @@ qrcode[pil]==7.4.2
 python-multipart==0.0.6
 psycopg2-binary==2.9.9
 python-multipart  # Para manejar uploads de archivos
+requests
