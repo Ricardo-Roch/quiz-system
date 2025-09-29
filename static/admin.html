@@ -1053,7 +1053,11 @@ function setupEventListeners() {
   document.getElementById('quizForm').addEventListener('submit', handleQuizSubmit);
   document.getElementById('userForm').addEventListener('submit', handleUserSubmit);
   document.getElementById('questionForm').addEventListener('submit', handleQuestionSubmit);
+  
+  // AGREGAR ESTA LÍNEA:
+  document.getElementById('questionType').addEventListener('change', handleQuestionTypeChange);
 }
+
 
 async function handleLogin(e) {
   e.preventDefault();
@@ -1817,8 +1821,12 @@ function openQuestionModal(question = null) {
   const modal = document.getElementById('questionModal');
   const title = document.getElementById('questionModalTitle');
   const form = document.getElementById('questionForm');
+  const container = document.getElementById('answersContainer');
   
+  // Limpiar estado previo
   document.getElementById('questionQuizId').value = currentQuizId;
+  document.getElementById('questionId').value = '';
+  container.innerHTML = '';
   answerCount = 0;
   
   if (question) {
@@ -1828,48 +1836,45 @@ function openQuestionModal(question = null) {
     document.getElementById('questionText').value = question.question_text;
     document.getElementById('questionOrder').value = question.question_order;
     document.getElementById('questionTimeLimit').value = question.time_limit;
-    
-    // FIX 1: CARGAR EL TIPO DE PREGUNTA CORRECTAMENTE
     document.getElementById('questionType').value = question.question_type || 'multiple_choice';
     
-    // Disparar el cambio de tipo para ajustar la interfaz
-    handleQuestionTypeChange();
+    // Ajustar interfaz según tipo SIN recrear respuestas
+    const questionType = question.question_type || 'multiple_choice';
+    const imageGroup = document.getElementById('questionImageGroup');
     
-    // Cargar imagen de pregunta si existe
-    if (question.image_url) {
-      setTimeout(() => {
-        const select = document.getElementById('questionImageSelect');
-        if (select) select.value = question.image_url;
-        
-        // Mostrar preview
-        const preview = document.getElementById('questionImagePreview');
-        if (preview && question.image_url) {
-          preview.innerHTML = `<img src="${question.image_url}" style="max-width: 300px; border-radius: 8px; border: 2px solid #3b82f6;">`;
-        }
-      }, 100);
+    if (questionType === 'image_choice') {
+      imageGroup.style.display = 'block';
+      const questionImageSelect = document.getElementById('questionImageSelect');
+      questionImageSelect.innerHTML = '<option value="">Sin imagen</option>' +
+        availableImages.questions.map(img => 
+          `<option value="${img}">${img.split('/').pop()}</option>`
+        ).join('');
+      
+      if (question.image_url) {
+        setTimeout(() => {
+          questionImageSelect.value = question.image_url;
+          const preview = document.getElementById('questionImagePreview');
+          if (preview) {
+            preview.innerHTML = `<img src="${question.image_url}" style="max-width: 300px; border-radius: 8px; border: 2px solid #3b82f6;">`;
+          }
+        }, 50);
+      }
+    } else {
+      imageGroup.style.display = 'none';
     }
-    
-    // FIX 2: LIMPIAR CONTENEDOR ANTES DE CARGAR RESPUESTAS
-    const container = document.getElementById('answersContainer');
-    container.innerHTML = '';
-    answerCount = 0;
     
     // Cargar respuestas según el tipo
     question.answers.forEach((answer) => {
-      if (question.question_type === 'image_choice') {
-        // Respuestas con imagen
+      if (questionType === 'image_choice') {
         addAnswerField(answer.image_url || '', answer.is_correct);
-        // Actualizar el campo de texto si existe
         const lastDiv = container.lastElementChild;
         const textInput = lastDiv.querySelector('.answer-text');
         if (textInput && answer.answer_text) {
           textInput.value = answer.answer_text;
         }
-      } else if (question.question_type === 'open_ended') {
-        // Respuesta de referencia para pregunta abierta
+      } else if (questionType === 'open_ended') {
         addAnswerField(answer.answer_text || '', false, true);
       } else {
-        // Respuestas de texto para opción múltiple
         addAnswerField(answer.answer_text || '', answer.is_correct);
       }
     });
@@ -1878,15 +1883,8 @@ function openQuestionModal(question = null) {
     // MODO CREACIÓN
     title.textContent = 'Agregar Pregunta';
     form.reset();
-    document.getElementById('questionId').value = '';
     document.getElementById('questionType').value = 'multiple_choice';
-    
-    handleQuestionTypeChange();
-    
-    // Crear respuestas por defecto para nueva pregunta
-    const container = document.getElementById('answersContainer');
-    container.innerHTML = '';
-    answerCount = 0;
+    document.getElementById('questionImageGroup').style.display = 'none';
     
     for (let i = 0; i < 4; i++) {
       addAnswerField();
@@ -1896,89 +1894,64 @@ function openQuestionModal(question = null) {
   modal.classList.add('show');
 }
 
-
 //de aquii ------------------------------------------------------------------------------------------------------------------------------------
 function removeAnswerField(button) {
   const questionType = document.getElementById('questionType').value;
   const answersContainer = document.getElementById('answersContainer');
-  const answerDivs = answersContainer.querySelectorAll('.form-group');
+  const answerDivs = answersContainer.querySelectorAll('[data-answer-index]');
   
-  // Para preguntas abiertas, no permitir eliminar la referencia
   if (questionType === 'open_ended') {
     alert('Las preguntas abiertas deben tener una respuesta de referencia');
     return;
   }
   
-  // FIX 4: PERMITIR MENOS DE 4 RESPUESTAS
-  // Para otros tipos, mantener al menos 2 respuestas
   if (answerDivs.length > 2) {
-    // Remover el elemento completamente del DOM
-    const parentDiv = button.closest('.form-group');
-    if (parentDiv) {
-      parentDiv.remove();
+    const parentDiv = button.closest('[data-answer-index]');
+    if (parentDiv && parentDiv.parentNode) {
+      parentDiv.parentNode.removeChild(parentDiv);
     }
   } else {
     alert('Debe haber al menos 2 respuestas');
   }
 }
-
 // Agregar event listener para cambio de tipo
-document.getElementById('questionType').addEventListener('change', handleQuestionTypeChange);
 
 function handleQuestionTypeChange() {
   const questionType = document.getElementById('questionType').value;
   const imageGroup = document.getElementById('questionImageGroup');
   const answersContainer = document.getElementById('answersContainer');
+  const questionId = document.getElementById('questionId').value;
   
-  // Mostrar/ocultar campo de imagen de pregunta
+  // Mostrar/ocultar campo de imagen
   if (questionType === 'image_choice') {
     imageGroup.style.display = 'block';
-    
     const questionImageSelect = document.getElementById('questionImageSelect');
     questionImageSelect.innerHTML = '<option value="">Sin imagen</option>' +
       availableImages.questions.map(img => 
         `<option value="${img}">${img.split('/').pop()}</option>`
       ).join('');
-    
-    // Preview de imagen de pregunta
-    questionImageSelect.addEventListener('change', (e) => {
-      const preview = document.getElementById('questionImagePreview');
-      if (e.target.value) {
-        preview.innerHTML = `<img src="${e.target.value}" style="max-width: 300px; border-radius: 8px; border: 2px solid #3b82f6;">`;
-      } else {
-        preview.innerHTML = '';
-      }
-    });
   } else {
     imageGroup.style.display = 'none';
   }
   
-  // FIX 3: NO RECREAR RESPUESTAS SI ESTÁ EN MODO EDICIÓN
-  const questionId = document.getElementById('questionId').value;
+  // NO recrear respuestas si está editando
   if (questionId) {
-    // Está editando, no borrar las respuestas existentes
     return;
   }
   
-  // SOLO RECREAR RESPUESTAS EN MODO CREACIÓN
+  // Solo recrear en modo creación
   answersContainer.innerHTML = '';
   answerCount = 0;
   
   if (questionType === 'open_ended') {
-    // Pregunta abierta: 1 respuesta de referencia
     addAnswerField('', false, true);
-  } else if (questionType === 'image_choice') {
-    // Imagen: 4 respuestas con imagen
-    for (let i = 0; i < 4; i++) {
-      addAnswerField();
-    }
   } else {
-    // Opción múltiple: 4 respuestas de texto
     for (let i = 0; i < 4; i++) {
       addAnswerField();
     }
   }
 }
+
 
 function addAnswerField(imageUrlOrText = '', isCorrect = false, isReference = false) {
   answerCount++;
