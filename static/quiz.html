@@ -696,13 +696,35 @@ function showQuestion() {
   
   qIndex.textContent = currentQuestionIndex + 1;
   questionText.textContent = question.question_text;
+  
+  // Mostrar imagen de la pregunta si existe
+  if (question.image_url) {
+    questionText.innerHTML = `
+      ${question.question_text}
+      <div style="margin-top: 16px;">
+        <img src="${question.image_url}" alt="Imagen de la pregunta" class="question-image" style="max-width: 100%; max-height: 300px; border-radius: 8px;">
+      </div>
+    `;
+  }
+  
   answers.innerHTML = '';
 
   // Crear botones de respuesta
   question.answers.forEach((answer, index) => {
     const btn = document.createElement('button');
     btn.className = 'answer';
-    btn.textContent = answer.answer_text;
+    
+    // CORRECCIÓN: Verificar si hay imagen o texto
+    if (answer.image_url) {
+      // Respuesta con imagen
+      btn.innerHTML = `
+        <img src="${answer.image_url}" alt="${answer.answer_text || 'Respuesta'}" style="max-width: 150px; max-height: 150px; border-radius: 8px; display: block; margin: 0 auto;">
+        ${answer.answer_text ? `<div style="margin-top: 8px; font-size: 14px;">${answer.answer_text}</div>` : ''}
+      `;
+    } else {
+      // Respuesta con texto solamente
+      btn.textContent = answer.answer_text;
+    }
     
     // IMPORTANTE: Resetear estado de botones
     btn.disabled = false;
@@ -722,7 +744,6 @@ function showQuestion() {
   updateTimer();
   timer = setInterval(tick, 100);
 }
-
     function tick() {
       timeLeft -= 0.1;
       if (timeLeft <= 0) {
