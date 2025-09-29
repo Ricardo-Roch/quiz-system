@@ -487,7 +487,7 @@ async def upload_image(file: UploadFile = File(...)):
         logger.error(f"Error uploading image: {e}")
         raise HTTPException(status_code=500, detail=f"Error al subir imagen: {str(e)}")
     
-c
+
     
 
 @app.get("/api/debug/files")
