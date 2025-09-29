@@ -491,6 +491,9 @@ async def upload_image(file: UploadFile = File(...)):
 def list_images():
     """Lista todas las imágenes disponibles en el directorio static/images"""
     try:
+        # Obtener el dominio base (funciona tanto en local como en Render)
+        BASE_URL = os.getenv("BASE_URL", "https://quiz-system-sfrf.onrender.com")
+        
         images = {
             "questions": [],
             "answers": []
@@ -499,14 +502,20 @@ def list_images():
         # Listar imágenes de preguntas
         questions_dir = "static/images/questions"
         if os.path.exists(questions_dir):
-            images["questions"] = [f"/static/images/questions/{f}" for f in os.listdir(questions_dir) 
-                                   if f.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp'))]
+            images["questions"] = [
+                f"{BASE_URL}/static/images/questions/{f}" 
+                for f in os.listdir(questions_dir) 
+                if f.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp'))
+            ]
         
         # Listar imágenes de respuestas  
         answers_dir = "static/images/answers"
         if os.path.exists(answers_dir):
-            images["answers"] = [f"/static/images/answers/{f}" for f in os.listdir(answers_dir)
-                                 if f.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp'))]
+            images["answers"] = [
+                f"{BASE_URL}/static/images/answers/{f}" 
+                for f in os.listdir(answers_dir)
+                if f.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp'))
+            ]
         
         return images
     except Exception as e:
