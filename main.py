@@ -786,7 +786,8 @@ def get_question(question_id: int, db: Session = Depends(get_db)):
         for a in sorted(question.answers, key=lambda x: x.answer_order):
             answers.append({
                 "id": a.id, 
-                "answer_text": a.answer_text, 
+                "answer_text": a.answer_text,
+                "image_url": a.image_url,  # ← AGREGAR ESTO
                 "is_correct": a.is_correct, 
                 "answer_order": a.answer_order
             })
@@ -794,6 +795,8 @@ def get_question(question_id: int, db: Session = Depends(get_db)):
         return {
             "id": question.id,
             "question_text": question.question_text,
+            "question_type": question.question_type or "multiple_choice",  # ← AGREGAR ESTO
+            "image_url": question.image_url,  # ← AGREGAR ESTO
             "question_order": question.question_order,
             "time_limit": question.time_limit,
             "answers": answers
@@ -803,6 +806,7 @@ def get_question(question_id: int, db: Session = Depends(get_db)):
     except Exception as e:
         logger.error(f"Error fetching question: {e}")
         raise HTTPException(status_code=500, detail="Error al obtener pregunta")
+
 
 @app.put("/api/questions/{question_id}")
 def update_question(question_id: int, question_update: QuestionUpdate, db: Session = Depends(get_db)):
