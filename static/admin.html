@@ -1823,23 +1823,16 @@ async function openQuestionModal(question = null) {
   const form = document.getElementById('questionForm');
   const container = document.getElementById('answersContainer');
   
-  // ESPERAR A QUE LAS IMÁGENES ESTÉN CARGADAS
   if (!availableImages.answers || availableImages.answers.length === 0) {
     await loadAvailableImages();
   }
   
-  console.log('Available images:', availableImages); // DEBUG
-  
-  // Limpiar estado previo
   document.getElementById('questionQuizId').value = currentQuizId;
   document.getElementById('questionId').value = '';
   container.innerHTML = '';
   answerCount = 0;
   
   if (question) {
-    console.log('Editing question:', question); // DEBUG
-    
-    // MODO EDICIÓN
     title.textContent = 'Editar Pregunta';
     document.getElementById('questionId').value = question.id;
     document.getElementById('questionText').value = question.question_text;
@@ -1847,45 +1840,20 @@ async function openQuestionModal(question = null) {
     document.getElementById('questionTimeLimit').value = question.time_limit;
     document.getElementById('questionType').value = question.question_type || 'multiple_choice';
     
-    // Ajustar interfaz según tipo
-    const questionType = question.question_type || 'multiple_choice';
-    const imageGroup = document.getElementById('questionImageGroup');
+    // ← AGREGAR ESTA LÍNEA:
+    handleQuestionTypeChange();
     
-    if (questionType === 'image_choice') {
-      imageGroup.style.display = 'block';
-      const questionImageSelect = document.getElementById('questionImageSelect');
-      
-      // Poblar selector de imagen de pregunta
-      questionImageSelect.innerHTML = '<option value="">Sin imagen</option>' +
-        availableImages.questions.map(img => 
-          `<option value="${img}">${img.split('/').pop()}</option>`
-        ).join('');
-      
-      if (question.image_url) {
-        setTimeout(() => {
-          questionImageSelect.value = question.image_url;
-          const preview = document.getElementById('questionImagePreview');
-          if (preview) {
-            preview.innerHTML = `<img src="${question.image_url}" style="max-width: 300px; border-radius: 8px; border: 2px solid #3b82f6;">`;
-          }
-        }, 50);
-      }
-    } else {
-      imageGroup.style.display = 'none';
-    }
-    
-    // Cargar respuestas según el tipo
+    // Cargar respuestas...
     question.answers.forEach((answer) => {
-      console.log('Loading answer:', answer); // DEBUG
-      
-      if (questionType === 'image_choice') {
+      const qType = question.question_type || 'multiple_choice';
+      if (qType === 'image_choice') {
         addAnswerField(answer.image_url || '', answer.is_correct);
         const lastDiv = container.lastElementChild;
         const textInput = lastDiv.querySelector('.answer-text');
         if (textInput && answer.answer_text) {
           textInput.value = answer.answer_text;
         }
-      } else if (questionType === 'open_ended') {
+      } else if (qType === 'open_ended') {
         addAnswerField(answer.answer_text || '', false, true);
       } else {
         addAnswerField(answer.answer_text || '', answer.is_correct);
@@ -1893,11 +1861,10 @@ async function openQuestionModal(question = null) {
     });
     
   } else {
-    // MODO CREACIÓN
     title.textContent = 'Agregar Pregunta';
     form.reset();
     document.getElementById('questionType').value = 'multiple_choice';
-    document.getElementById('questionImageGroup').style.display = 'none';
+    handleQuestionTypeChange(); // ← TAMBIÉN AQUÍ
     
     for (let i = 0; i < 4; i++) {
       addAnswerField();
@@ -1906,7 +1873,6 @@ async function openQuestionModal(question = null) {
   
   modal.classList.add('show');
 }
-
 
 //de aquii ------------------------------------------------------------------------------------------------------------------------------------
 function removeAnswerField(button) {
@@ -1936,36 +1902,36 @@ function handleQuestionTypeChange() {
   const answersContainer = document.getElementById('answersContainer');
   const questionId = document.getElementById('questionId').value;
   
-  // Mostrar/ocultar campo de imagen
+  // SIEMPRE actualizar visibilidad de imagen de pregunta
   if (questionType === 'image_choice') {
     imageGroup.style.display = 'block';
     const questionImageSelect = document.getElementById('questionImageSelect');
-    questionImageSelect.innerHTML = '<option value="">Sin imagen</option>' +
-      availableImages.questions.map(img => 
-        `<option value="${img}">${img.split('/').pop()}</option>`
-      ).join('');
+    
+    // Repoblar selector solo si está vacío
+    if (questionImageSelect.children.length <= 1) {
+      questionImageSelect.innerHTML = '<option value="">Sin imagen</option>' +
+        availableImages.questions.map(img => 
+          `<option value="${img}">${img.split('/').pop()}</option>`
+        ).join('');
+    }
   } else {
     imageGroup.style.display = 'none';
   }
   
-  // NO recrear respuestas si está editando
-  if (questionId) {
-    return;
-  }
-  
-  // Solo recrear en modo creación
-  answersContainer.innerHTML = '';
-  answerCount = 0;
-  
-  if (questionType === 'open_ended') {
-    addAnswerField('', false, true);
-  } else {
-    for (let i = 0; i < 4; i++) {
-      addAnswerField();
+  // Solo recrear respuestas si NO está editando
+  if (!questionId) {
+    answersContainer.innerHTML = '';
+    answerCount = 0;
+    
+    if (questionType === 'open_ended') {
+      addAnswerField('', false, true);
+    } else {
+      for (let i = 0; i < 4; i++) {
+        addAnswerField();
+      }
     }
   }
 }
-
 
 function addAnswerField(imageUrlOrText = '', isCorrect = false, isReference = false) {
   answerCount++;
