@@ -1082,14 +1082,12 @@ function setupEventListeners() {
   // EVENTOS PARA MÓDULO DE RESPUESTAS
   document.getElementById('responsesQuizSelect').addEventListener('change', handleResponsesQuizChange);
   document.getElementById('exportResponsesBtn').addEventListener('click', exportFilteredResponses);
-  // REMOVIDO: document.getElementById('deleteAllResponsesBtn').addEventListener('click', deleteAllResponses);
   
   document.getElementById('quizForm').addEventListener('submit', handleQuizSubmit);
   document.getElementById('userForm').addEventListener('submit', handleUserSubmit);
   document.getElementById('questionForm').addEventListener('submit', handleQuestionSubmit);
   document.getElementById('questionType').addEventListener('change', handleQuestionTypeChange);
 }
-
 
 async function handleLogin(e) {
   e.preventDefault();
@@ -1628,28 +1626,21 @@ async function loadDashboard() {
 async function handleQuizSelectChange(e) {
   const quizId = e.target.value;
   const leaderboardDiv = document.getElementById('leaderboard');
-  const responsesCard = document.getElementById('responsesCard');
   
   if (!quizId) {
     leaderboardDiv.innerHTML = '<div class="loading">Selecciona un quiz para ver el ranking</div>';
-    responsesCard.style.display = 'none';
     return;
   }
   
   leaderboardDiv.innerHTML = '<div class="loading">Cargando ranking...</div>';
-  responsesCard.style.display = 'block';
-  document.getElementById('responsesTable').innerHTML = '<div class="loading">Cargando respuestas...</div>';
   
   try {
     await loadLeaderboard(quizId);
-    await loadResponsesTable(quizId);
   } catch (error) {
     console.error('Error loading data:', error);
     leaderboardDiv.innerHTML = '<div class="error">Error al cargar el ranking</div>';
-    document.getElementById('responsesTable').innerHTML = '<div class="error">Error al cargar respuestas</div>';
   }
 }
-
 async function loadLeaderboard(quizId) {
   try {
     // Obtener participaciones completadas
@@ -1801,75 +1792,17 @@ async function loadLeaderboard(quizId) {
 // Reemplaza tu loadResponsesTable por esta versión.
 // Usa el endpoint /api/quizzes/{quiz_id}/responses si está disponible (más eficiente).
 // Si no existe, intenta por participaciones: /api/participations/?completed_only=true&quiz_id=...
-async function loadResponsesTable(quizId) {
-  try {
-    document.getElementById('responsesTable').innerHTML = `
-      <div class="loading">Cargando respuestas...</div>
-    `;
 
-    const responsesResp = await fetch(`${API_BASE_URL}/api/quizzes/${quizId}/responses`);
 
-    if (!responsesResp.ok) {
-      throw new Error(`Error ${responsesResp.status}: ${responsesResp.statusText}`);
-    }
-
-    let responses = await responsesResp.json();
-    console.log('Respuestas recibidas:', responses);
-
-    if (!Array.isArray(responses)) {
-      console.error('Respuesta no es un array:', responses);
-      responses = [];
-    }
-
-    // Guardar globalmente
-    window.currentResponsesData = responses;
-
-    if (!responses.length) {
-      document.getElementById('responsesTable').innerHTML = `
-        <div class="responses-table">
-          <table class="table table-striped table-compact">
-            <thead>
-              <tr>
-                <th>Usuario</th><th>UNI</th><th>Pregunta #</th><th>Tipo</th><th>Pregunta</th>
-                <th>Respuesta</th><th>Correcta</th><th>Tiempo (ms)</th><th>Fecha</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr><td colspan="9" class="empty-table">No hay respuestas registradas</td></tr>
-            </tbody>
-          </table>
-        </div>
-      `;
-      return;
-    }
-
-    // Ordenar respuestas
-    responses.sort((a, b) => {
-      if (a.user_uni !== b.user_uni) return String(a.user_uni).localeCompare(String(b.user_uni));
-      return (a.question_order || 0) - (b.question_order || 0);
-    });
-
-    renderResponsesTable(responses);
-
-  } catch (error) {
-    console.error('Error loading responses table:', error);
-    document.getElementById('responsesTable').innerHTML = `
-      <div class="error">Error al cargar respuestas: ${error.message}</div>
-    `;
-  }
-}
 // Actualizar también la función renderResponsesTable
 function renderResponsesTable(responses, container) {
-  // VALIDACIÓN: Verificar que el container existe
   if (!container) {
-    console.error('ERROR: Container is null in renderResponsesTable');
-    console.trace(); // Esto mostrará dónde se llamó la función
+    console.error('Container element not found');
     return;
   }
   
   console.log('Rendering table with', responses.length, 'responses');
   
-  // Generar las filas de la tabla
   const tableRows = responses.map(response => {
     const correctClass = response.is_correct ? 'correct-answer' : 'incorrect-answer';
     const correctIcon = response.is_correct ? '✓' : '✗';
@@ -1885,11 +1818,18 @@ function renderResponsesTable(responses, container) {
         <td class="${correctClass}">${correctIcon}</td>
         <td class="response-time">${response.response_time || 0}ms</td>
         <td>${formatDate(response.completed_at)}</td>
+        <td>
+          <button class="btn btn-small btn-primary" onclick="viewResponseDetails(${response.participation_id})" title="Ver detalles">
+            👁️
+          </button>
+          <button class="btn btn-small btn-danger" onclick="deleteResponse(${response.participation_id}, ${response.question_id})" title="Eliminar">
+            🗑️
+          </button>
+        </td>
       </tr>
     `;
   }).join('');
   
-  // USAR EL CONTAINER QUE SE PASÓ COMO PARÁMETRO
   container.innerHTML = `
     <div class="responses-table">
       <table class="table table-striped table-compact">
@@ -1904,9 +1844,10 @@ function renderResponsesTable(responses, container) {
             <th>Correcta</th>
             <th>Tiempo</th>
             <th>Fecha</th>
+            <th>Acciones</th>
           </tr>
         </thead>
-        <tbody>${tableRows || '<tr><td colspan="9" class="empty-table">No hay datos</td></tr>'}</tbody>
+        <tbody>${tableRows}</tbody>
       </table>
     </div>
   `;
