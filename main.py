@@ -1091,18 +1091,26 @@ def get_user_ranking(uni: str, quiz_id: int, db: Session = Depends(get_db)):
             }
         
         # Calcular score del usuario (solo preguntas no abiertas)
-        user_responses = db.query(UserResponse).join(Question).filter(
-            UserResponse.participation_id == user_participation.id,
-            Question.question_type != 'open_ended'
-        ).all()
+        user_responses = (
+            db.query(UserResponse)
+            .join(Question, UserResponse.question_id == Question.id)
+            .filter(
+                UserResponse.participation_id == user_participation.id,
+                Question.question_type != 'open_ended'
+            )
+            .all()
+        )
         
         user_total_score = 0
+        correct_count = 0
         for response in user_responses:
             if response.is_correct:
+                correct_count += 1
                 question = db.query(Question).filter(Question.id == response.question_id).first()
-                time_limit_ms = question.time_limit * 1000
-                time_bonus = max(0, time_limit_ms - response.response_time)
-                user_total_score += 1000 + time_bonus
+                if question:
+                    time_limit_ms = question.time_limit * 1000
+                    time_bonus = max(0, time_limit_ms - response.response_time)
+                    user_total_score += 1000 + int(time_bonus)
         
         # Obtener todas las participaciones completadas del quiz
         all_participations = db.query(Participation).filter(
@@ -1113,26 +1121,40 @@ def get_user_ranking(uni: str, quiz_id: int, db: Session = Depends(get_db)):
         # Calcular scores de todos
         rankings = []
         for participation in all_participations:
-            responses = db.query(UserResponse).join(Question).filter(
-                UserResponse.participation_id == participation.id,
-                Question.question_type != 'open_ended'
-            ).all()
-            
-            total_score = 0
-            for response in responses:
-                if response.is_correct:
-                    question = db.query(Question).filter(Question.id == response.question_id).first()
-                    time_limit_ms = question.time_limit * 1000
-                    time_bonus = max(0, time_limit_ms - response.response_time)
-                    total_score += 1000 + time_bonus
-            
-            rankings.append({
-                "user_id": participation.user_id,
-                "user_name": participation.user.name,
-                "user_uni": participation.user.uni,
-                "total_score": total_score,
-                "correct_answers": participation.score
-            })
+            try:
+                responses = (
+                    db.query(UserResponse)
+                    .join(Question, UserResponse.question_id == Question.id)
+                    .filter(
+                        UserResponse.participation_id == participation.id,
+                        Question.question_type != 'open_ended'
+                    )
+                    .all()
+                )
+                
+                total_score = 0
+                p_correct = 0
+                for response in responses:
+                    if response.is_correct:
+                        p_correct += 1
+                        question = db.query(Question).filter(Question.id == response.question_id).first()
+                        if question:
+                            time_limit_ms = question.time_limit * 1000
+                            time_bonus = max(0, time_limit_ms - response.response_time)
+                            total_score += 1000 + int(time_bonus)
+                
+                part_user = db.query(User).filter(User.id == participation.user_id).first()
+                if part_user:
+                    rankings.append({
+                        "user_id": participation.user_id,
+                        "user_name": part_user.name,
+                        "user_uni": part_user.uni,
+                        "total_score": total_score,
+                        "correct_answers": p_correct
+                    })
+            except Exception as e:
+                logger.error(f"Error processing participation {participation.id}: {e}")
+                continue
         
         # Ordenar por score
         rankings.sort(key=lambda x: x["total_score"], reverse=True)
@@ -1145,6 +1167,7 @@ def get_user_ranking(uni: str, quiz_id: int, db: Session = Depends(get_db)):
             "user_rank": user_rank,
             "total_participants": len(rankings),
             "user_score": user_total_score,
+            "correct_answers": correct_count,
             "top_3": rankings[:3]
         }
         
@@ -1152,7 +1175,10 @@ def get_user_ranking(uni: str, quiz_id: int, db: Session = Depends(get_db)):
         raise
     except Exception as e:
         logger.error(f"Error getting user ranking: {e}")
-        raise HTTPException(status_code=500, detail="Error al obtener ranking")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error al obtener ranking: {str(e)}")
+
 
 @app.post("/api/participate/{participation_id}/complete")
 def complete_participation(participation_id: int, db: Session = Depends(get_db)):

@@ -1232,49 +1232,65 @@ async function loadLeaderboard(quizId) {
       return;
     }
     
-    // Calcular scores con tiempo para cada participación
-    const rankingsPromises = participations.map(async (participation) => {
-      try {
-        // Obtener respuestas de la participación (solo no abiertas)
-        const responsesResp = await fetch(`${API_BASE_URL}/api/quizzes/${quizId}/responses`);
-        if (!responsesResp.ok) return null;
-        
-        const allResponses = await responsesResp.json();
-        const userResponses = allResponses.filter(r => 
-          r.user_uni === participation.user_uni && 
-          r.question_type !== 'open_ended'
-        );
-        
-        // Calcular score total
-        let totalScore = 0;
-        for (const response of userResponses) {
-          if (response.is_correct) {
-            // Obtener tiempo límite de la pregunta
-            const questionResp = await fetch(`${API_BASE_URL}/api/questions/${response.question_id}`);
-            if (questionResp.ok) {
-              const questionData = await questionResp.json();
-              const timeLimitMs = questionData.time_limit * 1000;
-              const timeBonus = Math.max(0, timeLimitMs - response.response_time);
-              totalScore += 1000 + timeBonus;
-            }
-          }
-        }
-        
-        return {
-          user_name: participation.user_name,
-          user_uni: participation.user_uni,
-          total_score: totalScore,
-          correct_answers: participation.score,
-          total_questions: participation.total_questions,
-          percentage: participation.percentage
-        };
-      } catch (error) {
-        console.error('Error processing participation:', error);
-        return null;
-      }
-    });
+    // Obtener respuestas del quiz (solo no abiertas)
+    const responsesResp = await fetch(`${API_BASE_URL}/api/quizzes/${quizId}/responses`);
+    if (!responsesResp.ok) {
+      throw new Error('Error al obtener respuestas');
+    }
     
-    const rankings = (await Promise.all(rankingsPromises)).filter(r => r !== null);
+    const allResponses = await responsesResp.json();
+    
+    // Calcular scores con tiempo para cada participación
+    const rankingsMap = new Map();
+    
+    for (const response of allResponses) {
+      if (response.question_type === 'open_ended') continue;
+      
+      const key = response.user_uni;
+      
+      if (!rankingsMap.has(key)) {
+        rankingsMap.set(key, {
+          user_name: response.user_name,
+          user_uni: response.user_uni,
+          total_score: 0,
+          correct_answers: 0,
+          total_questions: 0
+        });
+      }
+      
+      const ranking = rankingsMap.get(key);
+      ranking.total_questions++;
+      
+      if (response.is_correct) {
+        ranking.correct_answers++;
+        
+        // Obtener tiempo límite de la pregunta
+        try {
+          const questionResp = await fetch(`${API_BASE_URL}/api/questions/${response.question_id || 0}`);
+          if (questionResp.ok) {
+            const questionData = await questionResp.json();
+            const timeLimitMs = questionData.time_limit * 1000;
+            const timeBonus = Math.max(0, timeLimitMs - (response.response_time || 0));
+            ranking.total_score += 1000 + timeBonus;
+          }
+        } catch (err) {
+          console.error('Error getting question data:', err);
+        }
+      }
+    }
+    
+    const rankings = Array.from(rankingsMap.values());
+    
+    if (rankings.length === 0) {
+      document.getElementById('leaderboard').innerHTML = `
+        <div class="empty-leaderboard">
+          <div class="icon">🏆</div>
+          <h4>No hay datos de ranking</h4>
+          <p>No se pudieron calcular los rankings para este quiz.</p>
+        </div>
+      `;
+      return;
+    }
     
     // Ordenar por score total
     rankings.sort((a, b) => b.total_score - a.total_score);
@@ -1283,6 +1299,9 @@ async function loadLeaderboard(quizId) {
     const leaderboardHtml = rankings.map((participant, index) => {
       const rank = index + 1;
       const rankClass = rank <= 3 ? `rank-${rank}` : '';
+      const percentage = participant.total_questions > 0 
+        ? (participant.correct_answers / participant.total_questions * 100).toFixed(1) 
+        : 0;
       
       return `
         <div class="leaderboard-item ${rankClass}">
@@ -1298,7 +1317,7 @@ async function loadLeaderboard(quizId) {
             <div class="score-details">
               ${participant.correct_answers}/${participant.total_questions} correctas
               <br>
-              ${participant.percentage.toFixed(1)}% precisión
+              ${percentage}% precisión
             </div>
           </div>
         </div>
@@ -1316,7 +1335,6 @@ async function loadLeaderboard(quizId) {
     `;
   }
 }
-
 
 // Reemplaza tu loadResponsesTable por esta versión.
 // Usa el endpoint /api/quizzes/{quiz_id}/responses si está disponible (más eficiente).
