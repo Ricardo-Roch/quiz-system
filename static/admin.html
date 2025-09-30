@@ -1061,7 +1061,6 @@ document.addEventListener('DOMContentLoaded', function() {
   setupEventListeners();
 });
 
-
 function setupEventListeners() {
   loginForm.addEventListener('submit', handleLogin);
   document.getElementById('logoutBtn').addEventListener('click', handleLogout);
@@ -1079,13 +1078,20 @@ function setupEventListeners() {
   document.getElementById('addAnswerBtn').addEventListener('click', addAnswerField);
   document.getElementById('quizSelect').addEventListener('change', handleQuizSelectChange);
   
-  // EVENTOS PARA MÓDULO DE RESPUESTAS
   document.getElementById('responsesQuizSelect').addEventListener('change', handleResponsesQuizChange);
   document.getElementById('exportResponsesBtn').addEventListener('click', exportFilteredResponses);
   
   document.getElementById('quizForm').addEventListener('submit', handleQuizSubmit);
   document.getElementById('userForm').addEventListener('submit', handleUserSubmit);
-  document.getElementById('questionForm').addEventListener('submit', handleQuestionSubmit);
+  
+  // CRÍTICO: Agregar listener correcto para el formulario de preguntas
+  const questionForm = document.getElementById('questionForm');
+  questionForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    await handleQuestionSubmit(e);
+  });
+  
   document.getElementById('questionType').addEventListener('change', handleQuestionTypeChange);
 }
 
@@ -1324,34 +1330,6 @@ function closeDetailsModal() {
   }
 }
 
-// Actualizar setupEventListeners para incluir el botón de eliminar todas
-function setupEventListeners() {
-  loginForm.addEventListener('submit', handleLogin);
-  document.getElementById('logoutBtn').addEventListener('click', handleLogout);
-  
-  navLinks.forEach(link => {
-    link.addEventListener('click', (e) => {
-      e.preventDefault();
-      navigateToPage(link.dataset.page);
-    });
-  });
-  
-  document.getElementById('addQuizBtn').addEventListener('click', () => openQuizModal());
-  document.getElementById('addUserBtn').addEventListener('click', () => openUserModal());
-  document.getElementById('addQuestionBtn').addEventListener('click', async () => await openQuestionModal());
-  document.getElementById('addAnswerBtn').addEventListener('click', addAnswerField);
-  document.getElementById('quizSelect').addEventListener('change', handleQuizSelectChange);
-  
-  // EVENTOS PARA MÓDULO DE RESPUESTAS
-  document.getElementById('responsesQuizSelect').addEventListener('change', handleResponsesQuizChange);
-  document.getElementById('exportResponsesBtn').addEventListener('click', exportFilteredResponses);
-  document.getElementById('deleteAllResponsesBtn').addEventListener('click', deleteAllResponses); // NUEVO
-  
-  document.getElementById('quizForm').addEventListener('submit', handleQuizSubmit);
-  document.getElementById('userForm').addEventListener('submit', handleUserSubmit);
-  document.getElementById('questionForm').addEventListener('submit', handleQuestionSubmit);
-  document.getElementById('questionType').addEventListener('change', handleQuestionTypeChange);
-}
 
 // ============= UPDATE (Editar respuesta) =============
 async function editResponse(participationId, questionId) {
@@ -2525,7 +2503,6 @@ function handleQuestionTypeChange() {
   }
 }
 
-
 async function openQuestionModal(question = null) {
   const modal = document.getElementById('questionModal');
   const title = document.getElementById('questionModalTitle');
@@ -2538,7 +2515,6 @@ async function openQuestionModal(question = null) {
   }
   
   document.getElementById('questionQuizId').value = currentQuizId;
-  document.getElementById('questionId').value = '';
   container.innerHTML = '';
   answerCount = 0;
   
@@ -2567,7 +2543,6 @@ async function openQuestionModal(question = null) {
     if (questionType === 'image_choice') {
       imageGroup.style.display = 'block';
       
-      // Poblar selector de imagen de pregunta
       newQuestionImageSelect.innerHTML = '<option value="">Sin imagen</option>' +
         availableImages.questions.map(img => {
           const fileName = img.split('/').pop();
@@ -2575,7 +2550,6 @@ async function openQuestionModal(question = null) {
           return `<option value="${img}" ${selected}>${fileName}</option>`;
         }).join('');
       
-      // Agregar listener para preview
       newQuestionImageSelect.addEventListener('change', (e) => {
         const preview = document.getElementById('questionImagePreview');
         if (e.target.value) {
@@ -2585,7 +2559,6 @@ async function openQuestionModal(question = null) {
         }
       });
       
-      // Mostrar preview inicial si existe imagen
       if (question.image_url) {
         document.getElementById('questionImagePreview').innerHTML = 
           `<img src="${question.image_url}" style="max-width: 300px; border-radius: 8px; border: 2px solid #3b82f6;">`;
@@ -2598,7 +2571,7 @@ async function openQuestionModal(question = null) {
     if (question.answers && question.answers.length > 0) {
       question.answers.forEach((answer) => {
         if (questionType === 'image_choice') {
-          addAnswerField(answer.image_url || '', answer.is_correct);
+          addAnswerField(answer.image_url || '', answer.is_correct, false);
           const lastDiv = container.lastElementChild;
           const textInput = lastDiv.querySelector('.answer-text');
           if (textInput && answer.answer_text) {
@@ -2607,7 +2580,7 @@ async function openQuestionModal(question = null) {
         } else if (questionType === 'open_ended') {
           addAnswerField(answer.answer_text || '', false, true);
         } else {
-          addAnswerField(answer.answer_text || '', answer.is_correct);
+          addAnswerField(answer.answer_text || '', answer.is_correct, false);
         }
       });
     }
@@ -2616,16 +2589,167 @@ async function openQuestionModal(question = null) {
     // MODO CREACIÓN
     title.textContent = 'Agregar Pregunta';
     form.reset();
+    document.getElementById('questionId').value = '';
     document.getElementById('questionType').value = 'multiple_choice';
     document.getElementById('questionImageGroup').style.display = 'none';
     
     for (let i = 0; i < 4; i++) {
-      addAnswerField();
+      addAnswerField('', false, false);
     }
   }
   
   modal.classList.add('show');
 }
+
+async function handleQuestionSubmit(e) {
+  e.preventDefault(); // CRÍTICO: Prevenir recarga de página
+  e.stopPropagation(); // CRÍTICO: Detener propagación del evento
+  
+  const questionId = document.getElementById('questionId').value;
+  const questionType = document.getElementById('questionType').value;
+  
+  console.log('=== INICIANDO GUARDADO ===');
+  console.log('Question ID:', questionId);
+  console.log('Question Type:', questionType);
+  
+  // Obtener imagen de pregunta
+  let questionImageUrl = null;
+  const questionImageSelect = document.getElementById('questionImageSelect');
+  if (questionImageSelect && questionImageSelect.value) {
+    questionImageUrl = questionImageSelect.value;
+  }
+  
+  // Procesar respuestas
+  const answers = [];
+  const answerDivs = document.querySelectorAll('[data-answer-index]');
+  
+  console.log(`Procesando ${answerDivs.length} respuestas...`);
+  
+  for (let i = 0; i < answerDivs.length; i++) {
+    const div = answerDivs[i];
+    
+    let answerText = null;
+    let imageUrl = null;
+    let isCorrect = false;
+    
+    if (questionType === 'image_choice') {
+      const imageSelect = div.querySelector('.answer-image-select');
+      const textInput = div.querySelector('.answer-text');
+      const correctCheck = div.querySelector('.answer-correct-check');
+      
+      if (imageSelect) {
+        imageUrl = imageSelect.value || null;
+      }
+      
+      if (textInput) {
+        answerText = textInput.value || null;
+      }
+      
+      if (correctCheck) {
+        isCorrect = correctCheck.checked;
+      }
+      
+    } else {
+      const textInput = div.querySelector('.answer-text');
+      if (textInput) {
+        answerText = textInput.value || null;
+      }
+      
+      if (questionType !== 'open_ended') {
+        const correctCheck = div.querySelector('.answer-correct-check');
+        if (correctCheck) {
+          isCorrect = correctCheck.checked;
+        }
+      }
+    }
+    
+    answers.push({
+      answer_text: answerText,
+      image_url: imageUrl,
+      is_correct: isCorrect,
+      answer_order: i + 1
+    });
+  }
+  
+  // Validaciones
+  if (questionType === 'image_choice') {
+    const hasImage = answers.some(a => a.image_url && a.image_url.trim() !== '');
+    if (!hasImage) {
+      alert('Debes seleccionar al menos una imagen para las respuestas');
+      return false; // IMPORTANTE: Prevenir envío
+    }
+  }
+  
+  if (questionType !== 'open_ended') {
+    const hasCorrect = answers.some(a => a.is_correct);
+    if (!hasCorrect) {
+      alert('Debe marcar al menos una respuesta como correcta');
+      return false; // IMPORTANTE: Prevenir envío
+    }
+  }
+  
+  const questionData = {
+    question_text: document.getElementById('questionText').value,
+    question_type: questionType,
+    image_url: questionImageUrl,
+    question_order: parseInt(document.getElementById('questionOrder').value),
+    time_limit: parseInt(document.getElementById('questionTimeLimit').value),
+    answers: answers
+  };
+  
+  console.log('Datos finales a enviar:', JSON.stringify(questionData, null, 2));
+  
+  try {
+    let response;
+    let url;
+    let method;
+    
+    if (questionId) {
+      // MODO EDICIÓN
+      url = `${API_BASE_URL}/api/questions/${questionId}`;
+      method = 'PUT';
+      console.log(`Editando pregunta ${questionId}`);
+    } else {
+      // MODO CREACIÓN
+      url = `${API_BASE_URL}/api/quizzes/${currentQuizId}/questions`;
+      method = 'POST';
+      console.log(`Creando nueva pregunta en quiz ${currentQuizId}`);
+    }
+    
+    console.log(`Enviando ${method} a ${url}`);
+    
+    response = await fetch(url, {
+      method: method,
+      headers: { 
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify(questionData)
+    });
+    
+    console.log('Respuesta recibida:', response.status);
+    
+    if (response.ok) {
+      const result = await response.json();
+      console.log('Resultado:', result);
+      
+      closeModal('questionModal');
+      await loadQuestions(); // Recargar preguntas
+      showSuccess(questionId ? 'Pregunta actualizada exitosamente' : 'Pregunta creada exitosamente');
+    } else {
+      const errorData = await response.json();
+      console.error('Error del servidor:', errorData);
+      alert('Error: ' + (errorData.detail || 'Error desconocido'));
+    }
+    
+  } catch (error) {
+    console.error('Error en la petición:', error);
+    alert('Error al guardar: ' + error.message);
+  }
+  
+  return false; // IMPORTANTE: Prevenir comportamiento por defecto
+}
+
 
 function addAnswerField(imageUrlOrText = '', isCorrect = false, isReference = false) {
   answerCount++;
@@ -2740,132 +2864,6 @@ function addAnswerField(imageUrlOrText = '', isCorrect = false, isReference = fa
 }
 
 
-// Modificar handleQuestionSubmit - VERSIÓN COMPLETA CORREGIDA
-async function handleQuestionSubmit(e) {
-  e.preventDefault();
-  
-  const questionId = document.getElementById('questionId').value;
-  const questionType = document.getElementById('questionType').value;
-  
-  // Obtener imagen de pregunta
-  let questionImageUrl = null;
-  const questionImageSelect = document.getElementById('questionImageSelect');
-  if (questionImageSelect && questionImageSelect.value) {
-    questionImageUrl = questionImageSelect.value;
-  }
-  
-  // Procesar respuestas
-  const answers = [];
-  const answerDivs = document.querySelectorAll('[data-answer-index]');
-  
-  console.log(`Procesando ${answerDivs.length} respuestas...`);
-  
-  for (let i = 0; i < answerDivs.length; i++) {
-    const div = answerDivs[i];
-    
-    let answerText = null;
-    let imageUrl = null;
-    let isCorrect = false;
-    
-    if (questionType === 'image_choice') {
-      const imageSelect = div.querySelector('.answer-image-select');
-      const textInput = div.querySelector('.answer-text');
-      const correctCheck = div.querySelector('.answer-correct-check');
-      
-      if (imageSelect) {
-        imageUrl = imageSelect.value || null;
-        console.log(`Respuesta ${i+1}: image_url = ${imageUrl}`);
-      }
-      
-      if (textInput) {
-        answerText = textInput.value || null;
-      }
-      
-      if (correctCheck) {
-        isCorrect = correctCheck.checked;
-      }
-      
-    } else {
-      const textInput = div.querySelector('.answer-text');
-      if (textInput) {
-        answerText = textInput.value || null;
-      }
-      
-      if (questionType !== 'open_ended') {
-        const correctCheck = div.querySelector('.answer-correct-check');
-        if (correctCheck) {
-          isCorrect = correctCheck.checked;
-        }
-      }
-    }
-    
-    answers.push({
-      answer_text: answerText,
-      image_url: imageUrl,
-      is_correct: isCorrect,
-      answer_order: i + 1
-    });
-  }
-  
-  // Validaciones
-  if (questionType === 'image_choice') {
-    const hasImage = answers.some(a => a.image_url && a.image_url.trim() !== '');
-    if (!hasImage) {
-      alert('Debes seleccionar al menos una imagen para las respuestas');
-      return;
-    }
-  }
-  
-  if (questionType !== 'open_ended') {
-    const hasCorrect = answers.some(a => a.is_correct);
-    if (!hasCorrect) {
-      alert('Debe marcar al menos una respuesta como correcta');
-      return;
-    }
-  }
-  
-  const questionData = {
-    question_text: document.getElementById('questionText').value,
-    question_type: questionType,
-    image_url: questionImageUrl,
-    question_order: parseInt(document.getElementById('questionOrder').value),
-    time_limit: parseInt(document.getElementById('questionTimeLimit').value),
-    answers: answers
-  };
-  
-  console.log('Datos finales a enviar:', JSON.stringify(questionData, null, 2));
-  
-  try {
-    let response;
-    if (questionId) {
-      response = await fetch(`${API_BASE_URL}/api/questions/${questionId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(questionData)
-      });
-    } else {
-      response = await fetch(`${API_BASE_URL}/api/quizzes/${currentQuizId}/questions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(questionData)
-      });
-    }
-    
-    if (response.ok) {
-      closeModal('questionModal');
-      loadQuestions();
-      showSuccess(questionId ? 'Pregunta actualizada' : 'Pregunta creada');
-    } else {
-      const errorData = await response.json();
-      console.error('Error del servidor:', errorData);
-      alert('Error: ' + (errorData.detail || 'Error desconocido'));
-    }
-    
-  } catch (error) {
-    console.error('Error:', error);
-    alert('Error al guardar: ' + error.message);
-  }
-}
 
 
 //de aquii ------------------------------------------------------------------------------------------------------------------------------------
