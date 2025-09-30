@@ -442,32 +442,35 @@
       border-radius: 8px;
     }
 
-    .refresh-btn{
+  .refresh-btn{
       position: fixed;
       bottom: 80px;
       right: 20px;
-      width: 56px;
-      height: 56px;
+      width: 44px;
+      height: 44px;
       border-radius: 50%;
-      color: white;
-      border: none;
-      box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+      background: white;
+      color: var(--text-primary);
+      border: 1.5px solid var(--border);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
       cursor: pointer;
       font-size: 24px;
+      font-weight: 400;
       display: flex;
       align-items: center;
       justify-content: center;
       z-index: 999;
-      transition: all 0.3s ease;
+      transition: all 0.25s ease;
     }
 
     .refresh-btn:hover{
-      transform: scale(1.1) rotate(180deg);
-      box-shadow: 0 6px 20px rgba(59, 130, 246, 0.6);
+      border-color: var(--primary-blue);
+      color: var(--primary-blue);
+      box-shadow: 0 3px 10px rgba(59, 130, 246, 0.15);
     }
 
     .refresh-btn.spinning{
-      animation: spin 1s linear infinite;
+      animation: spin 0.7s linear infinite;
     }
 
     @keyframes spin{
@@ -842,7 +845,7 @@ function createRefreshButton() {
   const refreshBtn = document.createElement('button');
   refreshBtn.id = 'refreshBtn';
   refreshBtn.className = 'refresh-btn';
-  refreshBtn.innerHTML = '🔄';
+  refreshBtn.innerHTML = '↻'; // Usar símbolo Unicode en lugar de emoji
   refreshBtn.title = 'Actualizar datos';
   
   refreshBtn.onclick = async () => {
@@ -859,6 +862,8 @@ function createRefreshButton() {
   
   document.body.appendChild(refreshBtn);
 }
+
+
 function displayQuizzes() {
   quizList.innerHTML = '';
 
