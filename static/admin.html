@@ -833,11 +833,12 @@
         <div class="card">
           <div class="card-header">
             <h3 class="card-title">Filtrar por Quiz</h3>
-            <div style="display: flex; gap: 12px;">
+            <div style="display: flex; gap: 12px; align-items: center;">
               <select id="responsesQuizSelect" class="form-select" style="width: 300px;">
                 <option value="">Selecciona un quiz</option>
               </select>
               <button class="btn btn-success" id="exportResponsesBtn" disabled>📊 Exportar CSV</button>
+              <button class="btn btn-danger" id="deleteAllResponsesBtn" disabled>🗑️ Eliminar Todas</button>
             </div>
           </div>
           
@@ -1196,6 +1197,8 @@ function renderResponsesTable(responses, container) {
     return;
   }
   
+  console.log('Rendering table with', responses.length, 'responses');
+  
   const tableRows = responses.map(response => {
     const correctClass = response.is_correct ? 'correct-answer' : 'incorrect-answer';
     const correctIcon = response.is_correct ? '✓' : '✗';
@@ -1212,8 +1215,14 @@ function renderResponsesTable(responses, container) {
         <td class="response-time">${response.response_time || 0}ms</td>
         <td>${formatDate(response.completed_at)}</td>
         <td>
-          <button class="btn btn-danger btn-small" onclick="deleteResponse(${response.participation_id}, ${response.question_id})">
-            Eliminar
+          <button class="btn btn-small btn-primary" onclick="viewResponseDetails(${response.participation_id})" title="Ver detalles">
+            👁️
+          </button>
+          <button class="btn btn-small btn-warning" onclick="editResponse(${response.participation_id}, ${response.question_id})" title="Editar">
+            ✏️
+          </button>
+          <button class="btn btn-small btn-danger" onclick="deleteResponse(${response.participation_id}, ${response.question_id})" title="Eliminar">
+            🗑️
           </button>
         </td>
       </tr>
@@ -1243,13 +1252,269 @@ function renderResponsesTable(responses, container) {
   `;
 }
 
+// ============= CREATE (No aplica directamente, pero podemos agregar respuesta manual) =============
+
+// ============= READ (Ver detalles) =============
+async function viewResponseDetails(participationId) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/participations/${participationId}/responses`);
+    
+    if (!response.ok) {
+      throw new Error('No se pudo cargar los detalles');
+    }
+    
+    const responses = await response.json();
+    
+    if (responses.length === 0) {
+      alert('No hay detalles disponibles para esta participación');
+      return;
+    }
+    
+    // Crear HTML para mostrar detalles
+    const detailsHtml = `
+      <div style="max-height: 500px; overflow-y: auto;">
+        <h3 style="margin-top: 0;">Detalles de Participación</h3>
+        <p><strong>Usuario:</strong> ${responses[0].user_name} (${responses[0].user_uni})</p>
+        <hr>
+        ${responses.map((r, index) => `
+          <div style="margin-bottom: 20px; padding: 15px; background: var(--bg-secondary); border-radius: 8px;">
+            <h4>Pregunta ${index + 1}</h4>
+            <p><strong>Pregunta:</strong> ${escapeHtml(r.question_text)}</p>
+            <p><strong>Respuesta:</strong> ${escapeHtml(r.answer_text)}</p>
+            <p><strong>Correcta:</strong> <span style="color: ${r.is_correct ? 'var(--success)' : 'var(--accent-red)'};">${r.is_correct ? 'Sí ✓' : 'No ✗'}</span></p>
+            <p><strong>Tiempo:</strong> ${r.response_time}ms</p>
+            <p><strong>Fecha:</strong> ${formatDate(r.completed_at)}</p>
+          </div>
+        `).join('')}
+      </div>
+    `;
+    
+    // Mostrar en un modal (necesitamos crear uno temporal)
+    showDetailsModal(detailsHtml);
+    
+  } catch (error) {
+    console.error('Error:', error);
+    alert('No se pudieron cargar los detalles de la participación');
+  }
+}
+
+// Función para mostrar modal de detalles
+function showDetailsModal(htmlContent) {
+  // Crear modal temporal
+  const modalHtml = `
+    <div id="detailsModal" class="modal show">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title">Detalles de Respuestas</h2>
+          <button class="close-btn" onclick="closeDetailsModal()">&times;</button>
+        </div>
+        <div>${htmlContent}</div>
+        <div style="margin-top: 20px; text-align: right;">
+          <button class="btn btn-primary" onclick="closeDetailsModal()">Cerrar</button>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+function closeDetailsModal() {
+  const modal = document.getElementById('detailsModal');
+  if (modal) {
+    modal.remove();
+  }
+}
+
+// Actualizar setupEventListeners para incluir el botón de eliminar todas
+function setupEventListeners() {
+  loginForm.addEventListener('submit', handleLogin);
+  document.getElementById('logoutBtn').addEventListener('click', handleLogout);
+  
+  navLinks.forEach(link => {
+    link.addEventListener('click', (e) => {
+      e.preventDefault();
+      navigateToPage(link.dataset.page);
+    });
+  });
+  
+  document.getElementById('addQuizBtn').addEventListener('click', () => openQuizModal());
+  document.getElementById('addUserBtn').addEventListener('click', () => openUserModal());
+  document.getElementById('addQuestionBtn').addEventListener('click', async () => await openQuestionModal());
+  document.getElementById('addAnswerBtn').addEventListener('click', addAnswerField);
+  document.getElementById('quizSelect').addEventListener('change', handleQuizSelectChange);
+  
+  // EVENTOS PARA MÓDULO DE RESPUESTAS
+  document.getElementById('responsesQuizSelect').addEventListener('change', handleResponsesQuizChange);
+  document.getElementById('exportResponsesBtn').addEventListener('click', exportFilteredResponses);
+  document.getElementById('deleteAllResponsesBtn').addEventListener('click', deleteAllResponses); // NUEVO
+  
+  document.getElementById('quizForm').addEventListener('submit', handleQuizSubmit);
+  document.getElementById('userForm').addEventListener('submit', handleUserSubmit);
+  document.getElementById('questionForm').addEventListener('submit', handleQuestionSubmit);
+  document.getElementById('questionType').addEventListener('change', handleQuestionTypeChange);
+}
+
+// ============= UPDATE (Editar respuesta) =============
+async function editResponse(participationId, questionId) {
+  try {
+    // Buscar la respuesta en currentFilteredResponses
+    const response = currentFilteredResponses.find(
+      r => r.participation_id === participationId && r.question_id === questionId
+    );
+    
+    if (!response) {
+      alert('Respuesta no encontrada');
+      return;
+    }
+    
+    const newAnswer = prompt(
+      `Editar respuesta:\n\nPregunta: ${response.question_text}\nRespuesta actual: ${response.answer_text}\n\nIngresa la nueva respuesta:`,
+      response.answer_text
+    );
+    
+    if (newAnswer === null || newAnswer.trim() === '') {
+      return; // Usuario canceló
+    }
+    
+    // Nota: Este endpoint necesitaría implementarse en el backend
+    // Por ahora, solo mostramos un mensaje
+    alert('Función de edición en desarrollo. Requiere endpoint en el backend para actualizar respuestas individuales.');
+    
+    // IMPLEMENTACIÓN FUTURA (cuando el backend esté listo):
+    /*
+    const updateResponse = await fetch(`${API_BASE_URL}/api/responses/${participationId}/${questionId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ answer_text: newAnswer.trim() })
+    });
+    
+    if (updateResponse.ok) {
+      showSuccess('Respuesta actualizada exitosamente');
+      const quizSelect = document.getElementById('responsesQuizSelect');
+      handleResponsesQuizChange({ target: quizSelect });
+    } else {
+      throw new Error('Error al actualizar');
+    }
+    */
+    
+  } catch (error) {
+    console.error('Error:', error);
+    alert('No se pudo editar la respuesta');
+  }
+}
+
+// ============= DELETE (Eliminar respuesta individual) =============
+async function deleteResponse(participationId, questionId) {
+  const response = currentFilteredResponses.find(
+    r => r.participation_id === participationId && r.question_id === questionId
+  );
+  
+  if (!response) {
+    alert('Respuesta no encontrada');
+    return;
+  }
+  
+  const confirmMsg = `¿Eliminar esta respuesta?\n\nUsuario: ${response.user_name}\nPregunta: ${response.question_text}\n\n⚠️ Esta acción eliminará toda la participación del usuario.`;
+  
+  if (!confirm(confirmMsg)) return;
+  
+  try {
+    const deleteResponse = await fetch(`${API_BASE_URL}/api/participations/${participationId}`, {
+      method: 'DELETE'
+    });
+    
+    if (deleteResponse.ok) {
+      showSuccess('Participación eliminada exitosamente');
+      
+      // Recargar las respuestas del quiz actual
+      const quizSelect = document.getElementById('responsesQuizSelect');
+      if (quizSelect.value) {
+        handleResponsesQuizChange({ target: quizSelect });
+      }
+    } else {
+      throw new Error('Error al eliminar');
+    }
+    
+  } catch (error) {
+    console.error('Error:', error);
+    alert('No se pudo eliminar la respuesta');
+  }
+}
+
+// ============= DELETE ALL (Eliminar todas las respuestas de un quiz) =============
+async function deleteAllResponses() {
+  const quizSelect = document.getElementById('responsesQuizSelect');
+  const quizId = quizSelect.value;
+  const quizName = quizSelect.options[quizSelect.selectedIndex].text;
+  
+  if (!quizId) {
+    alert('Selecciona un quiz primero');
+    return;
+  }
+  
+  if (currentFilteredResponses.length === 0) {
+    alert('No hay respuestas para eliminar');
+    return;
+  }
+  
+  const confirmMsg = `⚠️ ADVERTENCIA ⚠️\n\n¿Eliminar TODAS las ${currentFilteredResponses.length} respuestas del quiz "${quizName}"?\n\nEsta acción NO se puede deshacer.`;
+  
+  if (!confirm(confirmMsg)) return;
+  
+  const doubleConfirm = prompt(`Escribe "ELIMINAR" para confirmar:`);
+  if (doubleConfirm !== 'ELIMINAR') {
+    alert('Operación cancelada');
+    return;
+  }
+  
+  try {
+    // Obtener IDs únicos de participaciones
+    const participationIds = [...new Set(currentFilteredResponses.map(r => r.participation_id))];
+    
+    let successCount = 0;
+    let errorCount = 0;
+    
+    // Eliminar cada participación
+    for (const participationId of participationIds) {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/participations/${participationId}`, {
+          method: 'DELETE'
+        });
+        
+        if (response.ok) {
+          successCount++;
+        } else {
+          errorCount++;
+        }
+      } catch (error) {
+        errorCount++;
+        console.error(`Error deleting participation ${participationId}:`, error);
+      }
+    }
+    
+    if (errorCount === 0) {
+      showSuccess(`${successCount} participaciones eliminadas exitosamente`);
+    } else {
+      alert(`Eliminadas: ${successCount}\nErrores: ${errorCount}`);
+    }
+    
+    // Recargar
+    handleResponsesQuizChange({ target: quizSelect });
+    
+  } catch (error) {
+    console.error('Error:', error);
+    alert('Error al eliminar respuestas');
+  }
+}
+
+
+
 async function handleResponsesQuizChange(e) {
   const quizId = e.target.value;
-  const container = document.getElementById('responsesListContainer'); // LÍNEA CRÍTICA
+  const container = document.getElementById('responsesListContainer');
   const exportBtn = document.getElementById('exportResponsesBtn');
-  
-  // DEBUGGING: Verificar que el container existe
-  console.log('Container element:', container);
+  const deleteAllBtn = document.getElementById('deleteAllResponsesBtn'); // NUEVO
   
   if (!container) {
     console.error('FATAL: #responsesListContainer element not found in DOM!');
@@ -1260,6 +1525,7 @@ async function handleResponsesQuizChange(e) {
   if (!quizId) {
     container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--text-muted);">Selecciona un quiz para ver las respuestas</div>';
     exportBtn.disabled = true;
+    deleteAllBtn.disabled = true; // NUEVO
     currentFilteredResponses = [];
     return;
   }
@@ -1286,13 +1552,22 @@ async function handleResponsesQuizChange(e) {
         </div>
       `;
       exportBtn.disabled = true;
+      deleteAllBtn.disabled = true; // NUEVO
       return;
     }
     
-    // VERIFICAR NUEVAMENTE ANTES DE RENDERIZAR
+    // Ordenar respuestas
+    responses.sort((a, b) => {
+      if (a.user_uni !== b.user_uni) {
+        return String(a.user_uni).localeCompare(String(b.user_uni));
+      }
+      return (a.question_order || 0) - (b.question_order || 0);
+    });
+    
     console.log('About to render, container is:', container);
     renderResponsesTable(responses, container);
     exportBtn.disabled = false;
+    deleteAllBtn.disabled = false; // NUEVO
     
   } catch (error) {
     console.error('Error loading responses:', error);
@@ -1303,9 +1578,11 @@ async function handleResponsesQuizChange(e) {
       </div>
     `;
     exportBtn.disabled = true;
+    deleteAllBtn.disabled = true; // NUEVO
     currentFilteredResponses = [];
   }
 }
+
 
 // NUEVA FUNCIÓN: Eliminar respuesta específica
 async function deleteResponse(participationId, questionId) {
