@@ -724,11 +724,17 @@ function showQuestion() {
 
   // MANEJO ESPECÍFICO PARA PREGUNTAS ABIERTAS
   if (question.question_type === 'open_ended') {
-    clearTimer(); // No hay timer para preguntas abiertas
+    // Mostrar timer para preguntas abiertas
+    timerDisplay.style.visibility = 'visible';
     
     const container = document.createElement('div');
     container.style.width = '100%';
+    container.style.maxWidth = '700px';
+    container.style.margin = '0 auto';
     container.style.padding = '20px';
+    container.style.display = 'flex';
+    container.style.flexDirection = 'column';
+    container.style.alignItems = 'center';
     
     const textarea = document.createElement('textarea');
     textarea.className = 'open-answer-input';
@@ -741,12 +747,14 @@ function showQuestion() {
     textarea.style.border = '2px solid var(--border)';
     textarea.style.resize = 'vertical';
     textarea.style.fontFamily = 'inherit';
+    textarea.style.textAlign = 'left';
     
     const submitBtn = document.createElement('button');
     submitBtn.className = 'btn submit-open-answer';
     submitBtn.textContent = 'Enviar Respuesta';
     submitBtn.style.marginTop = '20px';
     submitBtn.style.width = '100%';
+    submitBtn.style.maxWidth = '300px';
     
     submitBtn.onclick = () => {
       const userAnswer = textarea.value.trim();
@@ -755,8 +763,10 @@ function showQuestion() {
         return;
       }
       
+      clearTimer(); // Detener el timer al enviar
       submitBtn.disabled = true;
       submitBtn.textContent = 'Enviando...';
+      textarea.disabled = true;
       
       // Para preguntas abiertas, enviar el texto como respuesta
       submitOpenAnswer(question, userAnswer, submitBtn);
@@ -764,15 +774,41 @@ function showQuestion() {
     
     container.appendChild(textarea);
     container.appendChild(submitBtn);
+    
+    // Cambiar grid a un solo elemento centrado
+    answers.style.display = 'flex';
+    answers.style.justifyContent = 'center';
     answers.appendChild(container);
     
-    // Ocultar el timer para preguntas abiertas
-    timerDisplay.style.visibility = 'hidden';
-    prog.style.width = '100%';
+    // Iniciar timer para preguntas abiertas
+    timeLeft = question.time_limit || TIME_PER_QUESTION;
+    updateTimer();
+    timer = setInterval(() => {
+      timeLeft -= 0.1;
+      if (timeLeft <= 0) {
+        timeLeft = 0;
+        clearTimer();
+        
+        // Auto-submit cuando se acabe el tiempo
+        const userAnswer = textarea.value.trim();
+        if (userAnswer === '') {
+          alert('Se acabó el tiempo. Continuando con la siguiente pregunta...');
+          currentQuestionIndex++;
+          showQuestion();
+        } else {
+          submitBtn.disabled = true;
+          submitBtn.textContent = 'Enviando...';
+          textarea.disabled = true;
+          submitOpenAnswer(question, userAnswer, submitBtn);
+        }
+      }
+      updateTimer();
+    }, 100);
     
   } else if (question.question_type === 'image_choice') {
     // RESPUESTAS CON IMAGEN
     timerDisplay.style.visibility = 'visible';
+    answers.style.display = 'grid'; // Restaurar grid
     
     question.answers.forEach((answer, index) => {
       const btn = document.createElement('button');
@@ -827,6 +863,7 @@ function showQuestion() {
   } else {
     // RESPUESTAS DE TEXTO (multiple_choice)
     timerDisplay.style.visibility = 'visible';
+    answers.style.display = 'grid'; // Restaurar grid
     
     question.answers.forEach((answer, index) => {
       const btn = document.createElement('button');
@@ -847,7 +884,6 @@ function showQuestion() {
     timer = setInterval(tick, 100);
   }
 }
-
 // Nueva función para manejar el envío de respuestas abiertas
 // Nueva función para manejar el envío de respuestas abiertas
 async function submitOpenAnswer(question, userAnswerText, buttonEl) {
