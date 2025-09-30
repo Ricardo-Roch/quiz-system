@@ -1,0 +1,606 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>Mi Ranking - Conecta Hoot</title>
+  <style>
+    :root{
+      --bg-primary: #1a1a1a;
+      --bg-secondary: #2d2d2d;
+      --card-bg: #242424;
+      --text-primary: #ffffff;
+      --text-secondary: #a0a0a0;
+      --text-muted: #707070;
+      --accent-blue: #3b82f6;
+      --accent-gold: #fbbf24;
+      --accent-silver: #94a3b8;
+      --accent-bronze: #f97316;
+      --success: #10b981;
+      --border: #404040;
+      --primary-blue: #3b82f6;
+    }
+    
+    *{box-sizing:border-box}
+    
+    html,body{
+      height:100%;
+      margin:0;
+      font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;
+      color:var(--text-primary);
+      background: #1a1a1a;
+      overflow-x: hidden;
+    }
+    
+    .container{
+      min-height:100vh;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+    }
+    
+    .header{
+      width: 100%;
+      max-width: 500px;
+      text-align: center;
+      margin-bottom: 30px;
+      padding-top: 20px;
+    }
+    
+    .logo{
+      height: 60px;
+      margin-bottom: 20px;
+    }
+    
+    .title{
+      color: white;
+      font-size: 28px;
+      font-weight: 800;
+      margin: 0 0 8px 0;
+    }
+    
+    .subtitle{
+      color: var(--text-secondary);
+      font-size: 16px;
+      margin: 0;
+    }
+    
+    .scan-section{
+      width: 100%;
+      max-width: 500px;
+      background: var(--card-bg);
+      border-radius: 24px;
+      padding: 30px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+      margin-bottom: 20px;
+      border: 1px solid var(--border);
+    }
+    
+    .scan-section h2{
+      font-size: 22px;
+      font-weight: 700;
+      margin: 0 0 20px 0;
+      text-align: center;
+      color: var(--text-primary);
+    }
+    
+    #video{
+      width: 100%;
+      border-radius: 16px;
+      background: #000;
+      display: block;
+      max-height: 400px;
+    }
+    
+    .manual-input{
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 2px solid var(--border);
+    }
+    
+    .manual-input p{
+      text-align: center;
+      color: var(--text-secondary);
+      font-size: 14px;
+      margin-bottom: 12px;
+    }
+    
+    .input-group{
+      display: flex;
+      gap: 10px;
+    }
+    
+    .uni-input{
+      flex: 1;
+      padding: 12px 16px;
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 600;
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+    }
+    
+    .scan-btn{
+      background: linear-gradient(135deg, var(--primary-blue), #2563eb);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+      transition: all 0.3s ease;
+    }
+    
+    .scan-btn:hover{
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+    }
+    
+    .results-section{
+      width: 100%;
+      max-width: 500px;
+      display: none;
+    }
+    
+    .user-info{
+      background: var(--card-bg);
+      border-radius: 20px;
+      padding: 24px;
+      margin-bottom: 20px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      text-align: center;
+      border: 1px solid var(--border);
+    }
+    
+    .user-info h3{
+      font-size: 24px;
+      font-weight: 800;
+      margin: 0 0 8px 0;
+      color: var(--text-primary);
+    }
+    
+    .user-info p{
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--primary-blue);
+      margin: 0;
+    }
+    
+    .quiz-card{
+      background: var(--card-bg);
+      border-radius: 20px;
+      padding: 24px;
+      margin-bottom: 16px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      animation: slideUp 0.5s ease;
+      border: 1px solid var(--border);
+    }
+    
+    @keyframes slideUp{
+      from{
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to{
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    .quiz-header{
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      padding-bottom: 16px;
+      border-bottom: 2px solid var(--border);
+    }
+    
+    .quiz-title{
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin: 0;
+    }
+    
+    .quiz-area{
+      font-size: 14px;
+      color: var(--text-secondary);
+      margin: 4px 0 0 0;
+    }
+    
+    .rank-badge{
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      font-weight: 800;
+      color: white;
+      flex-shrink: 0;
+    }
+    
+    .rank-1{
+      background: linear-gradient(135deg, var(--accent-gold), #f59e0b);
+      box-shadow: 0 4px 15px rgba(251, 191, 36, 0.4);
+    }
+    
+    .rank-2{
+      background: linear-gradient(135deg, var(--accent-silver), #6b7280);
+      box-shadow: 0 4px 15px rgba(148, 163, 184, 0.4);
+    }
+    
+    .rank-3{
+      background: linear-gradient(135deg, var(--accent-bronze), #ea580c);
+      box-shadow: 0 4px 15px rgba(249, 115, 22, 0.4);
+    }
+    
+    .rank-other{
+      background: linear-gradient(135deg, var(--primary-blue), #2563eb);
+      box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+    }
+    
+    .stats-grid{
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+    
+    .stat-item{
+      background: var(--bg-secondary);
+      padding: 16px;
+      border-radius: 12px;
+      text-align: center;
+    }
+    
+    .stat-label{
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+    
+    .stat-value{
+      font-size: 24px;
+      font-weight: 800;
+      color: var(--text-primary);
+    }
+    
+    .loading{
+      text-align: center;
+      color: white;
+      font-size: 18px;
+      font-weight: 600;
+      padding: 40px;
+    }
+    
+    .error{
+      background: rgba(239, 68, 68, 0.2);
+      border: 2px solid rgba(239, 68, 68, 0.4);
+      color: #ff6b6b;
+      padding: 20px;
+      border-radius: 12px;
+      text-align: center;
+      font-size: 16px;
+      margin-top: 20px;
+    }
+    
+    .no-results{
+      text-align: center;
+      color: var(--text-secondary);
+      padding: 40px;
+      font-size: 18px;
+    }
+    
+    .back-btn{
+      background: var(--bg-secondary);
+      color: white;
+      border: 2px solid var(--border);
+      padding: 12px 24px;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 20px;
+      width: 100%;
+      max-width: 500px;
+      transition: all 0.3s ease;
+    }
+    
+    .back-btn:hover{
+      background: var(--border);
+    }
+    
+    .brand-footer{
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      opacity: 0.6;
+    }
+    
+    .brand-logo{
+      height: 28px;
+      width: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <img src="logoHootsinfondo.png" alt="Logo" class="logo" />
+      <h1 class="title">Mi Ranking</h1>
+      <p class="subtitle">Escanea tu código QR para ver tus resultados</p>
+    </div>
+
+    <!-- Scan Section -->
+    <div id="scanSection" class="scan-section">
+      <h2>Escanear Código QR</h2>
+      <video id="video" autoplay playsinline></video>
+      
+      <div class="manual-input">
+        <p>¿No puedes escanear? Ingresa tu UNI manualmente:</p>
+        <div class="input-group">
+          <input type="text" id="manualUni" class="uni-input" placeholder="Ej: 12345678" />
+          <button class="scan-btn" onclick="searchByUni()">Buscar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Results Section -->
+    <div id="resultsSection" class="results-section">
+      <div id="userInfo" class="user-info"></div>
+      <div id="quizResults"></div>
+      <button class="back-btn" onclick="resetSearch()">← Escanear Otro Código</button>
+    </div>
+
+    <div id="loading" class="loading" style="display:none;">Cargando resultados...</div>
+    <div id="error" class="error" style="display:none;"></div>
+
+    <div class="brand-footer">
+      <img src="logooIO.png" alt="Powered by" class="brand-logo" />
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+  <script>
+    const API_BASE_URL = 'https://quiz-system-sfrf.onrender.com';
+    
+    let videoStream = null;
+    let scanning = false;
+    
+    async function startScanner() {
+      try {
+        const video = document.getElementById('video');
+        
+        videoStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment' }
+        });
+        
+        video.srcObject = videoStream;
+        video.style.display = 'block';
+        
+        scanning = true;
+        scanQRCode();
+        
+      } catch (error) {
+        showError('No se pudo acceder a la cámara. Por favor, ingresa tu UNI manualmente.');
+      }
+    }
+    
+    function scanQRCode() {
+      if (!scanning) return;
+      
+      const video = document.getElementById('video');
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      
+      if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(imageData.data, imageData.width, imageData.height);
+        
+        if (code) {
+          const uni = code.data.trim();
+          stopScanner();
+          fetchUserRankings(uni);
+          return;
+        }
+      }
+      
+      requestAnimationFrame(scanQRCode);
+    }
+    
+    function stopScanner() {
+      scanning = false;
+      if (videoStream) {
+        videoStream.getTracks().forEach(track => track.stop());
+        videoStream = null;
+      }
+      document.getElementById('video').style.display = 'none';
+    }
+    
+    async function searchByUni() {
+      const uni = document.getElementById('manualUni').value.trim();
+      if (!uni) {
+        showError('Por favor ingresa tu UNI');
+        return;
+      }
+      fetchUserRankings(uni);
+    }
+    
+    async function fetchUserRankings(uni) {
+      try {
+        document.getElementById('loading').style.display = 'block';
+        document.getElementById('error').style.display = 'none';
+        document.getElementById('scanSection').style.display = 'none';
+        
+        // Obtener usuario
+        const userResponse = await fetch(`${API_BASE_URL}/api/users/by-uni/${uni}`);
+        if (!userResponse.ok) {
+          throw new Error('Usuario no encontrado');
+        }
+        const user = await userResponse.json();
+        
+        // Obtener participaciones del usuario
+        const participationsResponse = await fetch(`${API_BASE_URL}/api/users/${uni}/participations`);
+        if (!participationsResponse.ok) {
+          throw new Error('Error al obtener participaciones');
+        }
+        const participations = await participationsResponse.json();
+        
+        // Filtrar solo participaciones completadas
+        const completedParticipations = participations.filter(p => p.completed);
+        
+        if (completedParticipations.length === 0) {
+          showNoResults(user);
+          return;
+        }
+        
+        // Obtener ranking de cada quiz
+        const rankingsPromises = completedParticipations.map(async (p) => {
+          try {
+            const rankingResponse = await fetch(`${API_BASE_URL}/api/users/${uni}/quiz/${p.quiz_id}/ranking`);
+            if (!rankingResponse.ok) return null;
+            const ranking = await rankingResponse.json();
+            return { ...p, ranking };
+          } catch (error) {
+            return null;
+          }
+        });
+        
+        const results = await Promise.all(rankingsPromises);
+        const validResults = results.filter(r => r !== null && r.ranking && r.ranking.has_completed);
+        
+        if (validResults.length === 0) {
+          showNoResults(user);
+          return;
+        }
+        
+        displayResults(user, validResults);
+        
+      } catch (error) {
+        showError(error.message || 'Error al cargar los resultados');
+      } finally {
+        document.getElementById('loading').style.display = 'none';
+      }
+    }
+    
+    function displayResults(user, results) {
+      document.getElementById('resultsSection').style.display = 'block';
+      
+      // User info
+      document.getElementById('userInfo').innerHTML = `
+        <h3>${escapeHtml(user.name)}</h3>
+        <p>UNI: ${escapeHtml(user.uni)}</p>
+      `;
+      
+      // Quiz results
+      const quizResultsHtml = results.map(result => {
+        const rank = result.ranking.user_rank;
+        const totalParticipants = result.ranking.total_participants;
+        const score = result.ranking.user_score || 0;
+        const correctAnswers = result.ranking.correct_answers || 0;
+        
+        let rankClass = 'rank-other';
+        let rankEmoji = '🏅';
+        if (rank === 1) {
+          rankClass = 'rank-1';
+          rankEmoji = '🥇';
+        } else if (rank === 2) {
+          rankClass = 'rank-2';
+          rankEmoji = '🥈';
+        } else if (rank === 3) {
+          rankClass = 'rank-3';
+          rankEmoji = '🥉';
+        }
+        
+        return `
+          <div class="quiz-card">
+            <div class="quiz-header">
+              <div>
+                <h3 class="quiz-title">${escapeHtml(result.quiz_title)}</h3>
+                <p class="quiz-area">${escapeHtml(result.quiz_id)}</p>
+              </div>
+              <div class="rank-badge ${rankClass}">
+                ${rank}
+              </div>
+            </div>
+            <div class="stats-grid">
+              <div class="stat-item">
+                <div class="stat-label">Posición</div>
+                <div class="stat-value">${rankEmoji} ${rank}/${totalParticipants}</div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-label">Score</div>
+                <div class="stat-value">${score.toLocaleString()}</div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-label">Correctas</div>
+                <div class="stat-value">${correctAnswers}/${result.total_questions}</div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-label">Porcentaje</div>
+                <div class="stat-value">${result.percentage.toFixed(1)}%</div>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+      
+      document.getElementById('quizResults').innerHTML = quizResultsHtml;
+    }
+    
+    function showNoResults(user) {
+      document.getElementById('resultsSection').style.display = 'block';
+      document.getElementById('userInfo').innerHTML = `
+        <h3>${escapeHtml(user.name)}</h3>
+        <p>UNI: ${escapeHtml(user.uni)}</p>
+      `;
+      document.getElementById('quizResults').innerHTML = `
+        <div class="no-results">
+          <p>📝 Aún no has completado ningún quiz</p>
+        </div>
+      `;
+    }
+    
+    function showError(message) {
+      document.getElementById('error').textContent = message;
+      document.getElementById('error').style.display = 'block';
+      document.getElementById('scanSection').style.display = 'block';
+    }
+    
+    function resetSearch() {
+      stopScanner();
+      document.getElementById('resultsSection').style.display = 'none';
+      document.getElementById('scanSection').style.display = 'block';
+      document.getElementById('video').style.display = 'block';
+      document.getElementById('manualUni').value = '';
+      document.getElementById('error').style.display = 'none';
+      startScanner();
+    }
+    
+    function escapeHtml(text) {
+      if (!text) return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+    
+    // Auto-start scanner on load
+    window.addEventListener('load', () => {
+      startScanner();
+    });
+  </script>
+</body>
+</html>
