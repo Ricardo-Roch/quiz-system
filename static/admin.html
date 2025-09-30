@@ -764,6 +764,12 @@
           </a>
         </li>
         <li class="nav-item">
+          <a class="nav-link" data-page="responses">
+            <span class="nav-icon">📋</span>
+            Respuestas
+          </a>
+        </li>
+        <li class="nav-item">
           <a class="nav-link" data-page="users">
             <span class="nav-icon">👥</span>
             Usuarios
@@ -799,26 +805,6 @@
           </div>
         </div>
 
-        <div class="card" id="responsesCard" style="display: none;">
-          <div class="card-header">
-            <h3 class="card-title">📋 Detalle de Respuestas</h3>
-            <button class="btn btn-success" id="exportBtn">📊 Exportar CSV</button>
-          </div>
-          <div id="responsesTable">
-            <div class="loading">Cargando respuestas...</div>
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="card-header">
-            <h3 class="card-title">Actividad Reciente</h3>
-          </div>
-          <div id="recentActivity">
-            <div class="loading">Cargando actividad...</div>
-          </div>
-        </div>
-      </div>
-
       <!-- Quizzes Page -->
       <div id="quizzesPage" class="page hidden">
         <div class="page-header">
@@ -836,7 +822,29 @@
           </div>
         </div>
       </div>
+      <!-- Responses Page -->
+      <div id="responsesPage" class="page hidden">
+        <div class="page-header">
+          <h1 class="page-title">Gestión de Respuestas</h1>
+          <p class="page-subtitle">Administra todas las respuestas del sistema</p>
+        </div>
 
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Filtrar por Quiz</h3>
+            <div style="display: flex; gap: 12px;">
+              <select id="responsesQuizSelect" class="form-select" style="width: 300px;">
+                <option value="">Selecciona un quiz</option>
+              </select>
+              <button class="btn btn-success" id="exportResponsesBtn" disabled>📊 Exportar CSV</button>
+            </div>
+          </div>
+          
+          <div id="responsesListContainer">
+            <div class="loading">Selecciona un quiz para ver las respuestas</div>
+          </div>
+        </div>
+      </div>
       <!-- Users Page -->
       <div id="usersPage" class="page hidden">
         <div class="page-header">
@@ -856,6 +864,7 @@
       </div>
     </main>
   </div>
+  
 
   <!-- Quiz Modal -->
   <div id="quizModal" class="modal">
@@ -1044,6 +1053,7 @@ document.addEventListener('DOMContentLoaded', function() {
   setupEventListeners();
 });
 
+let currentFilteredResponses = [];
 
 function setupEventListeners() {
   loginForm.addEventListener('submit', handleLogin);
@@ -1069,6 +1079,9 @@ document.getElementById('addQuestionBtn').addEventListener('click', async () => 
   
   // AGREGAR ESTA LÍNEA:
   document.getElementById('questionType').addEventListener('change', handleQuestionTypeChange);
+   document.getElementById('responsesQuizSelect').addEventListener('change', handleResponsesQuizChange);
+  document.getElementById('exportResponsesBtn').addEventListener('click', exportFilteredResponses);
+
 }
 
 
@@ -1105,6 +1118,7 @@ function showAdminPanel() {
   navigateToPage('dashboard');
 }
 
+// Modificar navigateToPage para agregar caso 'responses':
 function navigateToPage(pageName) {
   navLinks.forEach(link => {
     link.classList.toggle('active', link.dataset.page === pageName);
@@ -1118,7 +1132,150 @@ function navigateToPage(pageName) {
     case 'dashboard': loadDashboard(); break;
     case 'quizzes': loadQuizzes(); break;
     case 'users': loadUsers(); break;
+    case 'responses': loadResponsesModule(); break; // AGREGAR ESTA LÍNEA
   }
+}
+// NUEVA FUNCIÓN: Cargar módulo de respuestas
+async function loadResponsesModule() {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/quizzes/`);
+    const quizzes = await response.json();
+    
+    const select = document.getElementById('responsesQuizSelect');
+    select.innerHTML = '<option value="">Selecciona un quiz</option>' +
+      quizzes.map(quiz => `<option value="${quiz.id}">${quiz.title} - ${quiz.area}</option>`).join('');
+    
+    document.getElementById('responsesListContainer').innerHTML = 
+      '<div style="text-align: center; padding: 40px; color: var(--text-muted);">Selecciona un quiz para ver las respuestas</div>';
+    
+  } catch (error) {
+    console.error('Error loading responses module:', error);
+  }
+}
+
+// NUEVA FUNCIÓN: Cargar módulo de respuestas
+async function loadResponsesModule() {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/quizzes/`);
+    const quizzes = await response.json();
+    
+    const select = document.getElementById('responsesQuizSelect');
+    select.innerHTML = '<option value="">Selecciona un quiz</option>' +
+      quizzes.map(quiz => `<option value="${quiz.id}">${quiz.title} - ${quiz.area}</option>`).join('');
+    
+    document.getElementById('responsesListContainer').innerHTML = 
+      '<div style="text-align: center; padding: 40px; color: var(--text-muted);">Selecciona un quiz para ver las respuestas</div>';
+    
+  } catch (error) {
+    console.error('Error loading responses module:', error);
+  }
+}
+// NUEVA FUNCIÓN: Renderizar tabla de respuestas con acciones CRUD
+function renderResponsesTable(responses, container) {
+  const tableRows = responses.map(response => {
+    const correctClass = response.is_correct ? 'correct-answer' : 'incorrect-answer';
+    const correctIcon = response.is_correct ? '✓' : '✗';
+    
+    return `
+      <tr>
+        <td>${escapeHtml(response.user_name)}</td>
+        <td><strong>${escapeHtml(response.user_uni)}</strong></td>
+        <td>${response.question_order || 0}</td>
+        <td>${response.question_type || 'multiple_choice'}</td>
+        <td style="max-width: 250px; word-wrap: break-word;">${escapeHtml(response.question_text)}</td>
+        <td style="max-width: 200px; word-wrap: break-word;">${escapeHtml(response.answer_text)}</td>
+        <td class="${correctClass}">${correctIcon}</td>
+        <td class="response-time">${response.response_time || 0}ms</td>
+        <td>${formatDate(response.completed_at)}</td>
+        <td>
+          <button class="btn btn-danger btn-small" onclick="deleteResponse(${response.participation_id}, ${response.question_id})">
+            Eliminar
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+  
+  container.innerHTML = `
+    <div class="responses-table">
+      <table class="table table-striped table-compact">
+        <thead>
+          <tr>
+            <th>Usuario</th>
+            <th>UNI</th>
+            <th>Pregunta #</th>
+            <th>Tipo</th>
+            <th>Pregunta</th>
+            <th>Respuesta</th>
+            <th>Correcta</th>
+            <th>Tiempo</th>
+            <th>Fecha</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>${tableRows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+// NUEVA FUNCIÓN: Eliminar respuesta específica
+async function deleteResponse(participationId, questionId) {
+  if (!confirm('¿Eliminar esta respuesta? Esta acción no se puede deshacer.')) return;
+  
+  try {
+    // Endpoint: eliminar participación completa o respuesta específica
+    const response = await fetch(`${API_BASE_URL}/api/participations/${participationId}`, {
+      method: 'DELETE'
+    });
+    
+    if (response.ok) {
+      showSuccess('Respuesta eliminada exitosamente');
+      handleResponsesQuizChange({ target: document.getElementById('responsesQuizSelect') });
+    } else {
+      throw new Error('Error al eliminar');
+    }
+    
+  } catch (error) {
+    console.error('Error:', error);
+    alert('No se pudo eliminar la respuesta');
+  }
+}
+
+// NUEVA FUNCIÓN: Exportar respuestas filtradas
+function exportFilteredResponses() {
+  if (currentFilteredResponses.length === 0) {
+    alert('No hay datos para exportar');
+    return;
+  }
+  
+  const select = document.getElementById('responsesQuizSelect');
+  const quizName = select.options[select.selectedIndex].text;
+  
+  const csvData = currentFilteredResponses.map(r => ({
+    'Usuario': r.user_name,
+    'UNI': r.user_uni,
+    'Pregunta #': r.question_order,
+    'Tipo': r.question_type,
+    'Pregunta': r.question_text,
+    'Respuesta': r.answer_text,
+    'Correcta': r.is_correct ? 'Sí' : 'No',
+    'Tiempo (ms)': r.response_time,
+    'Fecha': formatDate(r.completed_at)
+  }));
+  
+  const csv = convertToCSV(csvData);
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  link.setAttribute('href', url);
+  link.setAttribute('download', `respuestas_${quizName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.csv`);
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  
+  showSuccess('CSV exportado exitosamente');
 }
 
 async function loadDashboard() {
@@ -1159,19 +1316,7 @@ async function loadDashboard() {
       `<option value="${quiz.id}">${quiz.title} - ${quiz.area}</option>`
     ).join('');
     quizSelect.innerHTML = '<option value="">Selecciona un quiz</option>' + quizOptions;
-    
-    // Recent activity
-    const recentHtml = quizzes.slice(0, 5).map(quiz => `
-      <div style="padding: 12px 0; border-bottom: 1px solid var(--border);">
-        <strong>${quiz.title}</strong> - ${quiz.area}
-        <div style="font-size: 12px; color: var(--text-muted);">
-          ${new Date(quiz.created_at).toLocaleDateString()}
-        </div>
-      </div>
-    `).join('');
-    
-    document.getElementById('recentActivity').innerHTML = recentHtml || '<p>No hay actividad reciente</p>';
-    
+  
   } catch (error) {
     console.error('Error loading dashboard:', error);
     document.getElementById('statsGrid').innerHTML = '<div class="error">Error al cargar estadísticas</div>';
