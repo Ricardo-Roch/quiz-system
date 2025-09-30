@@ -804,6 +804,7 @@
             <div class="loading">Selecciona un quiz para ver el ranking</div>
           </div>
         </div>
+      </div>  <!-- AGREGAR ESTE CIERRE -->
 
       <!-- Quizzes Page -->
       <div id="quizzesPage" class="page hidden">
@@ -1005,6 +1006,7 @@ let currentQuizId = null;
 let currentQuestionId = null;
 let answerCount = 0;
 let currentResponsesData = [];
+let currentFilteredResponses = []; // AGREGAR ESTA LÍNEA
 
 // DOM Elements
 const loginScreen = document.getElementById('loginScreen');
@@ -1018,6 +1020,9 @@ const pages = document.querySelectorAll('.page');
 
 // Al inicio del script, agregar variable global
 let availableImages = { questions: [], answers: [] };
+
+
+
 
 // Agregar función para cargar imágenes disponibles
 async function loadAvailableImages() {
@@ -1053,7 +1058,6 @@ document.addEventListener('DOMContentLoaded', function() {
   setupEventListeners();
 });
 
-let currentFilteredResponses = [];
 
 function setupEventListeners() {
   loginForm.addEventListener('submit', handleLogin);
@@ -1068,21 +1072,20 @@ function setupEventListeners() {
   
   document.getElementById('addQuizBtn').addEventListener('click', () => openQuizModal());
   document.getElementById('addUserBtn').addEventListener('click', () => openUserModal());
-document.getElementById('addQuestionBtn').addEventListener('click', async () => await openQuestionModal());
+  document.getElementById('addQuestionBtn').addEventListener('click', async () => await openQuestionModal());
   document.getElementById('addAnswerBtn').addEventListener('click', addAnswerField);
   document.getElementById('quizSelect').addEventListener('change', handleQuizSelectChange);
-  document.getElementById('exportBtn').addEventListener('click', exportResponses);
+  
+  // EVENTOS PARA MÓDULO DE RESPUESTAS
+  document.getElementById('responsesQuizSelect').addEventListener('change', handleResponsesQuizChange);
+  document.getElementById('exportResponsesBtn').addEventListener('click', exportFilteredResponses);
   
   document.getElementById('quizForm').addEventListener('submit', handleQuizSubmit);
   document.getElementById('userForm').addEventListener('submit', handleUserSubmit);
   document.getElementById('questionForm').addEventListener('submit', handleQuestionSubmit);
-  
-  // AGREGAR ESTA LÍNEA:
   document.getElementById('questionType').addEventListener('change', handleQuestionTypeChange);
-   document.getElementById('responsesQuizSelect').addEventListener('change', handleResponsesQuizChange);
-  document.getElementById('exportResponsesBtn').addEventListener('click', exportFilteredResponses);
-
 }
+
 
 
 async function handleLogin(e) {
@@ -1129,12 +1132,21 @@ function navigateToPage(pageName) {
   });
   
   switch(pageName) {
-    case 'dashboard': loadDashboard(); break;
-    case 'quizzes': loadQuizzes(); break;
-    case 'users': loadUsers(); break;
-    case 'responses': loadResponsesModule(); break; // AGREGAR ESTA LÍNEA
+    case 'dashboard': 
+      loadDashboard(); 
+      break;
+    case 'quizzes': 
+      loadQuizzes(); 
+      break;
+    case 'users': 
+      loadUsers(); 
+      break;
+    case 'responses': 
+      loadResponsesModule(); 
+      break;
   }
 }
+
 // NUEVA FUNCIÓN: Cargar módulo de respuestas
 async function loadResponsesModule() {
   try {
@@ -1148,8 +1160,13 @@ async function loadResponsesModule() {
     document.getElementById('responsesListContainer').innerHTML = 
       '<div style="text-align: center; padding: 40px; color: var(--text-muted);">Selecciona un quiz para ver las respuestas</div>';
     
+    // Limpiar el botón de exportar
+    document.getElementById('exportResponsesBtn').disabled = true;
+    
   } catch (error) {
     console.error('Error loading responses module:', error);
+    document.getElementById('responsesListContainer').innerHTML = 
+      '<div class="error">Error al cargar el módulo de respuestas</div>';
   }
 }
 
@@ -1217,6 +1234,53 @@ function renderResponsesTable(responses, container) {
       </table>
     </div>
   `;
+}
+async function handleResponsesQuizChange(e) {
+  const quizId = e.target.value;
+  const container = document.getElementById('responsesListContainer');
+  const exportBtn = document.getElementById('exportResponsesBtn');
+  
+  if (!quizId) {
+    container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--text-muted);">Selecciona un quiz para ver las respuestas</div>';
+    exportBtn.disabled = true;
+    currentFilteredResponses = [];
+    return;
+  }
+  
+  container.innerHTML = '<div class="loading">Cargando respuestas...</div>';
+  
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/quizzes/${quizId}/responses`);
+    
+    if (!response.ok) {
+      throw new Error('Error al obtener respuestas');
+    }
+    
+    const responses = await response.json();
+    currentFilteredResponses = responses;
+    
+    if (responses.length === 0) {
+      container.innerHTML = `
+        <div class="empty-table">
+          No hay respuestas registradas para este quiz
+        </div>
+      `;
+      exportBtn.disabled = true;
+      return;
+    }
+    
+    // Renderizar tabla
+    renderResponsesTable(responses, container);
+    exportBtn.disabled = false;
+    
+  } catch (error) {
+    console.error('Error loading responses:', error);
+    container.innerHTML = `
+      <div class="error">Error al cargar respuestas: ${error.message}</div>
+    `;
+    exportBtn.disabled = true;
+    currentFilteredResponses = [];
+  }
 }
 
 // NUEVA FUNCIÓN: Eliminar respuesta específica
