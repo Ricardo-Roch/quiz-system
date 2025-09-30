@@ -955,27 +955,46 @@ function createQuizCard(quiz) {
   let clickAction = null;
 
   if (status.status === 'completed') {
+    // QUIZ COMPLETADO - Mostrar ranking integrado
     statusHtml = `
-      <div class="quiz-status" style="background: rgba(16, 185, 129, 0.1); color: var(--success);">
+      <div class="quiz-title">${quiz.title}</div>
+      <div class="quiz-area">${quiz.area}</div>
+      <div class="quiz-status" style="background: rgba(16, 185, 129, 0.1); color: var(--success); margin: 12px 0;">
         ✓ Completado (${status.score}/${status.total_questions})
       </div>
-      <span style="color: var(--text-muted);">Quiz ya realizado</span>
+      <div id="ranking-${quiz.id}" style="margin-top: 16px;">
+        <div style="text-align: center; color: var(--text-muted); font-size: 14px;">Cargando ranking...</div>
+      </div>
     `;
-    card.style.opacity = '0.7';
-    card.style.cursor = 'not-allowed';
+    card.style.cursor = 'default';
+    
+    // Cargar ranking específico de este quiz
+    loadQuizRanking(quiz.id);
+    
   } else if (status.status === 'in_progress') {
     statusHtml = `
-      <div class="quiz-status" style="background: rgba(251, 191, 36, 0.1); color: #f59e0b;">
-        ⏳ En progreso (${status.current_score} pts)
+      <div class="quiz-title">${quiz.title}</div>
+      <div class="quiz-area">${quiz.area}</div>
+      <div class="quiz-description">${quiz.description || 'Sin descripción disponible'}</div>
+      <div class="quiz-meta">
+        <div class="quiz-status" style="background: rgba(251, 191, 36, 0.1); color: #f59e0b;">
+          ⏳ En progreso (${status.current_score} pts)
+        </div>
+        <span style="color: var(--primary-blue);">Click para continuar</span>
       </div>
-      <span style="color: var(--primary-blue);">Click para continuar</span>
     `;
     clickAction = () => startQuiz(quiz.id);
     card.style.cursor = 'pointer';
+    
   } else {
     statusHtml = `
-      <div class="quiz-status status-active">Disponible</div>
-      <span>Click para iniciar</span>
+      <div class="quiz-title">${quiz.title}</div>
+      <div class="quiz-area">${quiz.area}</div>
+      <div class="quiz-description">${quiz.description || 'Sin descripción disponible'}</div>
+      <div class="quiz-meta">
+        <div class="quiz-status status-active">Disponible</div>
+        <span>Click para iniciar</span>
+      </div>
     `;
     clickAction = () => startQuiz(quiz.id);
     card.style.cursor = 'pointer';
@@ -985,17 +1004,10 @@ function createQuizCard(quiz) {
     card.onclick = clickAction;
   }
 
-  card.innerHTML = `
-    <div class="quiz-title">${quiz.title}</div>
-    <div class="quiz-area">${quiz.area}</div>
-    <div class="quiz-description">${quiz.description || 'Sin descripción disponible'}</div>
-    <div class="quiz-meta">
-      ${statusHtml}
-    </div>
-  `;
-
+  card.innerHTML = statusHtml;
   return card;
 }
+
 
 function generateQRCode(uni) {
   qrCode.innerHTML = '';
