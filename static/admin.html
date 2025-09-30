@@ -838,7 +838,7 @@
                 <option value="">Selecciona un quiz</option>
               </select>
               <button class="btn btn-success" id="exportResponsesBtn" disabled>📊 Exportar CSV</button>
-              <button class="btn btn-danger" id="deleteAllResponsesBtn" disabled>🗑️ Eliminar Todas</button>
+              <!-- BOTÓN ELIMINAR TODAS REMOVIDO -->
             </div>
           </div>
           
@@ -1082,13 +1082,13 @@ function setupEventListeners() {
   // EVENTOS PARA MÓDULO DE RESPUESTAS
   document.getElementById('responsesQuizSelect').addEventListener('change', handleResponsesQuizChange);
   document.getElementById('exportResponsesBtn').addEventListener('click', exportFilteredResponses);
+  // REMOVIDO: document.getElementById('deleteAllResponsesBtn').addEventListener('click', deleteAllResponses);
   
   document.getElementById('quizForm').addEventListener('submit', handleQuizSubmit);
   document.getElementById('userForm').addEventListener('submit', handleUserSubmit);
   document.getElementById('questionForm').addEventListener('submit', handleQuestionSubmit);
   document.getElementById('questionType').addEventListener('change', handleQuestionTypeChange);
 }
-
 
 
 async function handleLogin(e) {
@@ -1442,71 +1442,6 @@ async function deleteResponse(participationId, questionId) {
   }
 }
 
-// ============= DELETE ALL (Eliminar todas las respuestas de un quiz) =============
-async function deleteAllResponses() {
-  const quizSelect = document.getElementById('responsesQuizSelect');
-  const quizId = quizSelect.value;
-  const quizName = quizSelect.options[quizSelect.selectedIndex].text;
-  
-  if (!quizId) {
-    alert('Selecciona un quiz primero');
-    return;
-  }
-  
-  if (currentFilteredResponses.length === 0) {
-    alert('No hay respuestas para eliminar');
-    return;
-  }
-  
-  const confirmMsg = `⚠️ ADVERTENCIA ⚠️\n\n¿Eliminar TODAS las ${currentFilteredResponses.length} respuestas del quiz "${quizName}"?\n\nEsta acción NO se puede deshacer.`;
-  
-  if (!confirm(confirmMsg)) return;
-  
-  const doubleConfirm = prompt(`Escribe "ELIMINAR" para confirmar:`);
-  if (doubleConfirm !== 'ELIMINAR') {
-    alert('Operación cancelada');
-    return;
-  }
-  
-  try {
-    // Obtener IDs únicos de participaciones
-    const participationIds = [...new Set(currentFilteredResponses.map(r => r.participation_id))];
-    
-    let successCount = 0;
-    let errorCount = 0;
-    
-    // Eliminar cada participación
-    for (const participationId of participationIds) {
-      try {
-        const response = await fetch(`${API_BASE_URL}/api/participations/${participationId}`, {
-          method: 'DELETE'
-        });
-        
-        if (response.ok) {
-          successCount++;
-        } else {
-          errorCount++;
-        }
-      } catch (error) {
-        errorCount++;
-        console.error(`Error deleting participation ${participationId}:`, error);
-      }
-    }
-    
-    if (errorCount === 0) {
-      showSuccess(`${successCount} participaciones eliminadas exitosamente`);
-    } else {
-      alert(`Eliminadas: ${successCount}\nErrores: ${errorCount}`);
-    }
-    
-    // Recargar
-    handleResponsesQuizChange({ target: quizSelect });
-    
-  } catch (error) {
-    console.error('Error:', error);
-    alert('Error al eliminar respuestas');
-  }
-}
 
 
 
@@ -1514,7 +1449,7 @@ async function handleResponsesQuizChange(e) {
   const quizId = e.target.value;
   const container = document.getElementById('responsesListContainer');
   const exportBtn = document.getElementById('exportResponsesBtn');
-  const deleteAllBtn = document.getElementById('deleteAllResponsesBtn'); // NUEVO
+  // REMOVIDO: const deleteAllBtn = document.getElementById('deleteAllResponsesBtn');
   
   if (!container) {
     console.error('FATAL: #responsesListContainer element not found in DOM!');
@@ -1525,7 +1460,7 @@ async function handleResponsesQuizChange(e) {
   if (!quizId) {
     container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--text-muted);">Selecciona un quiz para ver las respuestas</div>';
     exportBtn.disabled = true;
-    deleteAllBtn.disabled = true; // NUEVO
+    // REMOVIDO: deleteAllBtn.disabled = true;
     currentFilteredResponses = [];
     return;
   }
@@ -1552,7 +1487,7 @@ async function handleResponsesQuizChange(e) {
         </div>
       `;
       exportBtn.disabled = true;
-      deleteAllBtn.disabled = true; // NUEVO
+      // REMOVIDO: deleteAllBtn.disabled = true;
       return;
     }
     
@@ -1567,7 +1502,7 @@ async function handleResponsesQuizChange(e) {
     console.log('About to render, container is:', container);
     renderResponsesTable(responses, container);
     exportBtn.disabled = false;
-    deleteAllBtn.disabled = false; // NUEVO
+    // REMOVIDO: deleteAllBtn.disabled = false;
     
   } catch (error) {
     console.error('Error loading responses:', error);
@@ -1578,10 +1513,11 @@ async function handleResponsesQuizChange(e) {
       </div>
     `;
     exportBtn.disabled = true;
-    deleteAllBtn.disabled = true; // NUEVO
+    // REMOVIDO: deleteAllBtn.disabled = true;
     currentFilteredResponses = [];
   }
 }
+
 
 
 // NUEVA FUNCIÓN: Eliminar respuesta específica
