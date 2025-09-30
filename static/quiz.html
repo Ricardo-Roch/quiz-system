@@ -849,6 +849,7 @@ function showQuestion() {
 }
 
 // Nueva función para manejar el envío de respuestas abiertas
+// Nueva función para manejar el envío de respuestas abiertas
 async function submitOpenAnswer(question, userAnswerText, buttonEl) {
   const responseTime = 0; // Las preguntas abiertas no tienen tiempo límite
   
@@ -866,7 +867,7 @@ async function submitOpenAnswer(question, userAnswerText, buttonEl) {
       body: JSON.stringify({
         question_id: question.id,
         answer_id: question.answers[0]?.id, // ID de la respuesta de referencia
-        answer_text: userAnswerText, // El texto escrito por el usuario
+        open_answer_text: userAnswerText, // ← CAMBIADO de answer_text a open_answer_text
         response_time: responseTime
       })
     });
