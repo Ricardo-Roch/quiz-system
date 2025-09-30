@@ -835,6 +835,7 @@ async function loadQuizzes() {
 }
 
 // NUEVO: Función para cargar rankings
+// NUEVO: Función para cargar rankings
 async function loadAllRankings() {
   try {
     let hasAnyRanking = false;
@@ -863,17 +864,26 @@ async function loadAllRankings() {
                   de ${ranking.total_participants} participantes
                   <br>
                   Score: ${ranking.user_score.toLocaleString()} puntos
+                  <br>
+                  ${ranking.correct_answers || 0} respuestas correctas
                 </div>
                 
                 ${ranking.top_3 && ranking.top_3.length > 0 ? `
                   <div class="top-players">
                     <h5 style="margin: 0 0 12px 0; color: var(--text-secondary);">Top 3:</h5>
-                    ${ranking.top_3.map((player, idx) => `
-                      <div class="top-player">
-                        <span><strong>#${idx + 1}</strong> ${player.user_name}</span>
-                        <span>${player.total_score.toLocaleString()} pts</span>
-                      </div>
-                    `).join('')}
+                    ${ranking.top_3.map((player, idx) => {
+                      let medalClass = '';
+                      if (idx === 0) medalClass = 'rank-gold';
+                      else if (idx === 1) medalClass = 'rank-silver';
+                      else if (idx === 2) medalClass = 'rank-bronze';
+                      
+                      return `
+                        <div class="top-player">
+                          <span class="${medalClass}"><strong>#${idx + 1}</strong> ${player.user_name}</span>
+                          <span>${player.total_score.toLocaleString()} pts</span>
+                        </div>
+                      `;
+                    }).join('')}
                   </div>
                 ` : ''}
               </div>
@@ -894,11 +904,11 @@ async function loadAllRankings() {
     console.error('Error loading rankings:', error);
   }
 }
-
+// NUEVO: Botón de refresh
 // NUEVO: Botón de refresh
 function createRefreshButton() {
   const existingBtn = document.getElementById('refreshBtn');
-  if (existingBtn) return;
+  if (existingBtn) existingBtn.remove();
   
   const refreshBtn = document.createElement('button');
   refreshBtn.id = 'refreshBtn';
@@ -908,15 +918,18 @@ function createRefreshButton() {
   
   refreshBtn.onclick = async () => {
     refreshBtn.classList.add('spinning');
+    refreshBtn.disabled = true;
+    
     await loadQuizzes();
+    
     setTimeout(() => {
       refreshBtn.classList.remove('spinning');
+      refreshBtn.disabled = false;
     }, 1000);
   };
   
   document.body.appendChild(refreshBtn);
 }
-
 function displayQuizzes() {
   quizList.innerHTML = '';
 
@@ -1033,6 +1046,7 @@ function showQuizList() {
   // NUEVO: Crear botón de refresh
   createRefreshButton();
 }
+
 
 function showLoginScreen() {
   quizListScreen.style.display = 'none';
