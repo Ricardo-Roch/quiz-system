@@ -1507,16 +1507,15 @@ def get_quiz_responses(quiz_id: int, db: Session = Depends(get_db)):
         if not quiz:
             raise HTTPException(status_code=404, detail="Quiz no encontrado")
         
-        # Función para limpiar texto
         def clean_text(text):
             if not text:
                 return "N/A"
             return str(text).replace('\n', ' ').replace('\r', ' ').replace('\t', ' ').strip()
         
-        # Obtener respuestas con LEFT JOIN para evitar errores
         responses = (
             db.query(
                 UserResponse.id,
+                UserResponse.question_id,
                 UserResponse.is_correct,
                 UserResponse.response_time,
                 UserResponse.answered_at,
@@ -1533,14 +1532,13 @@ def get_quiz_responses(quiz_id: int, db: Session = Depends(get_db)):
             .join(Participation, UserResponse.participation_id == Participation.id)
             .join(User, Participation.user_id == User.id)
             .join(Question, UserResponse.question_id == Question.id)
-            .outerjoin(Answer, UserResponse.answer_id == Answer.id)  # LEFT JOIN
+            .outerjoin(Answer, UserResponse.answer_id == Answer.id)
             .filter(Participation.quiz_id == quiz_id)
             .all()
         )
 
         result = []
         for r in responses:
-            # Manejar respuestas abiertas y de opción múltiple
             answer_text = "N/A"
             if r.open_answer_text:
                 answer_text = clean_text(r.open_answer_text)
@@ -1549,6 +1547,7 @@ def get_quiz_responses(quiz_id: int, db: Session = Depends(get_db)):
             
             result.append({
                 "participation_id": r.participation_id,
+                "question_id": r.question_id,
                 "user_name": clean_text(r.user_name) if r.user_name else "Usuario Eliminado",
                 "user_uni": clean_text(r.user_uni) if r.user_uni else "N/A",
                 "question_order": r.question_order or 0,
@@ -1570,6 +1569,8 @@ def get_quiz_responses(quiz_id: int, db: Session = Depends(get_db)):
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Error al obtener respuestas: {str(e)}")
+
+
 # Bulk operations
 @app.post("/api/quizzes/bulk-toggle")
 def bulk_toggle_quizzes(quiz_ids: List[int], is_active: bool, db: Session = Depends(get_db)):

@@ -1232,7 +1232,16 @@ async function loadLeaderboard(quizId) {
       return;
     }
     
-    // Obtener respuestas del quiz (solo no abiertas)
+    // Obtener todas las preguntas del quiz con sus time_limit
+    const questionsMap = new Map();
+    for (const question of selectedQuiz.questions) {
+      questionsMap.set(question.id, {
+        time_limit: question.time_limit,
+        question_type: question.question_type
+      });
+    }
+    
+    // Obtener respuestas del quiz
     const responsesResp = await fetch(`${API_BASE_URL}/api/quizzes/${quizId}/responses`);
     if (!responsesResp.ok) {
       throw new Error('Error al obtener respuestas');
@@ -1244,7 +1253,23 @@ async function loadLeaderboard(quizId) {
     const rankingsMap = new Map();
     
     for (const response of allResponses) {
-      if (response.question_type === 'open_ended') continue;
+      // Validar que tengamos question_id
+      if (!response.question_id) {
+        console.warn('Response sin question_id:', response);
+        continue;
+      }
+      
+      // Obtener info de la pregunta del mapa
+      const questionInfo = questionsMap.get(response.question_id);
+      if (!questionInfo) {
+        console.warn('No se encontró info para question_id:', response.question_id);
+        continue;
+      }
+      
+      // Saltar preguntas abiertas
+      if (questionInfo.question_type === 'open_ended') {
+        continue;
+      }
       
       const key = response.user_uni;
       
@@ -1264,18 +1289,9 @@ async function loadLeaderboard(quizId) {
       if (response.is_correct) {
         ranking.correct_answers++;
         
-        // Obtener tiempo límite de la pregunta
-        try {
-          const questionResp = await fetch(`${API_BASE_URL}/api/questions/${response.question_id || 0}`);
-          if (questionResp.ok) {
-            const questionData = await questionResp.json();
-            const timeLimitMs = questionData.time_limit * 1000;
-            const timeBonus = Math.max(0, timeLimitMs - (response.response_time || 0));
-            ranking.total_score += 1000 + timeBonus;
-          }
-        } catch (err) {
-          console.error('Error getting question data:', err);
-        }
+        const timeLimitMs = questionInfo.time_limit * 1000;
+        const timeBonus = Math.max(0, timeLimitMs - (response.response_time || 0));
+        ranking.total_score += 1000 + Math.floor(timeBonus);
       }
     }
     
@@ -1335,7 +1351,6 @@ async function loadLeaderboard(quizId) {
     `;
   }
 }
-
 // Reemplaza tu loadResponsesTable por esta versión.
 // Usa el endpoint /api/quizzes/{quiz_id}/responses si está disponible (más eficiente).
 // Si no existe, intenta por participaciones: /api/participations/?completed_only=true&quiz_id=...
@@ -1345,7 +1360,6 @@ async function loadResponsesTable(quizId) {
       <div class="loading">Cargando respuestas...</div>
     `;
 
-    // Usar el endpoint corregido
     const responsesResp = await fetch(`${API_BASE_URL}/api/quizzes/${quizId}/responses`);
 
     if (!responsesResp.ok) {
@@ -1355,7 +1369,6 @@ async function loadResponsesTable(quizId) {
     let responses = await responsesResp.json();
     console.log('Respuestas recibidas:', responses);
 
-    // Verificar que sea un array
     if (!Array.isArray(responses)) {
       console.error('Respuesta no es un array:', responses);
       responses = [];
@@ -1389,7 +1402,6 @@ async function loadResponsesTable(quizId) {
       return (a.question_order || 0) - (b.question_order || 0);
     });
 
-    // Renderizar tabla
     renderResponsesTable(responses);
 
   } catch (error) {
@@ -1399,7 +1411,6 @@ async function loadResponsesTable(quizId) {
     `;
   }
 }
-
 // Actualizar también la función renderResponsesTable
 function renderResponsesTable(responses) {
   const tableRows = responses.map(response => {
