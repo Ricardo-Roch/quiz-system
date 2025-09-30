@@ -1115,8 +1115,9 @@ function timeoutAnswer() {
 
 
 
- function displayResults(result) {
+function displayResults(result) {
   const percentage = result.percentage;
+  const totalScore = result.total_score || 0;
   
   // Título basado en el resultado
   if (percentage >= 90) {
@@ -1133,14 +1134,19 @@ function timeoutAnswer() {
     scoreDisplay.className = 'score-display score-poor';
   }
 
-  // Mostrar puntuación
+  // Mostrar puntuación CON SCORE
   scoreText.innerHTML = `
     <div style="font-size: 48px; margin-bottom: 8px;">${result.score}/${result.total_questions}</div>
-    <div style="font-size: 20px;">${percentage}% Correcto</div>
+    <div style="font-size: 20px; margin-bottom: 12px;">${percentage}% Correcto</div>
+    <div style="font-size: 24px; color: #3b82f6; font-weight: 700;">
+      🏆 Score: ${totalScore.toLocaleString()} puntos
+    </div>
   `;
 
   resultMessage.textContent = `¡Gracias por participar en "${currentQuiz.title}"!`;
 }
+
+
 
 function restartQuiz() {
   // Reset del juego

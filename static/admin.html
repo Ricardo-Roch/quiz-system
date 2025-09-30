@@ -1205,7 +1205,7 @@ async function handleQuizSelectChange(e) {
 
 async function loadLeaderboard(quizId) {
   try {
-    // Usar endpoint existente de participaciones generales y filtrar
+    // Obtener participaciones completadas
     const response = await fetch(`${API_BASE_URL}/api/participations/?completed_only=true`);
     
     if (!response.ok) {
@@ -1232,19 +1232,57 @@ async function loadLeaderboard(quizId) {
       return;
     }
     
-    // Ordenar por porcentaje y luego por score
-    const rankings = participations.sort((a, b) => {
-      if (b.percentage !== a.percentage) {
-        return b.percentage - a.percentage;
+    // Calcular scores con tiempo para cada participación
+    const rankingsPromises = participations.map(async (participation) => {
+      try {
+        // Obtener respuestas de la participación (solo no abiertas)
+        const responsesResp = await fetch(`${API_BASE_URL}/api/quizzes/${quizId}/responses`);
+        if (!responsesResp.ok) return null;
+        
+        const allResponses = await responsesResp.json();
+        const userResponses = allResponses.filter(r => 
+          r.user_uni === participation.user_uni && 
+          r.question_type !== 'open_ended'
+        );
+        
+        // Calcular score total
+        let totalScore = 0;
+        for (const response of userResponses) {
+          if (response.is_correct) {
+            // Obtener tiempo límite de la pregunta
+            const questionResp = await fetch(`${API_BASE_URL}/api/questions/${response.question_id}`);
+            if (questionResp.ok) {
+              const questionData = await questionResp.json();
+              const timeLimitMs = questionData.time_limit * 1000;
+              const timeBonus = Math.max(0, timeLimitMs - response.response_time);
+              totalScore += 1000 + timeBonus;
+            }
+          }
+        }
+        
+        return {
+          user_name: participation.user_name,
+          user_uni: participation.user_uni,
+          total_score: totalScore,
+          correct_answers: participation.score,
+          total_questions: participation.total_questions,
+          percentage: participation.percentage
+        };
+      } catch (error) {
+        console.error('Error processing participation:', error);
+        return null;
       }
-      return b.score - a.score;
     });
+    
+    const rankings = (await Promise.all(rankingsPromises)).filter(r => r !== null);
+    
+    // Ordenar por score total
+    rankings.sort((a, b) => b.total_score - a.total_score);
     
     // Generar HTML del leaderboard
     const leaderboardHtml = rankings.map((participant, index) => {
       const rank = index + 1;
       const rankClass = rank <= 3 ? `rank-${rank}` : '';
-      const totalScore = Math.round(participant.percentage * 10); // Score basado en porcentaje
       
       return `
         <div class="leaderboard-item ${rankClass}">
@@ -1256,9 +1294,9 @@ async function loadLeaderboard(quizId) {
             </div>
           </div>
           <div class="score-info">
-            <div class="total-score">${totalScore}</div>
+            <div class="total-score">${participant.total_score.toLocaleString()}</div>
             <div class="score-details">
-              ${participant.score}/${participant.total_questions} correctas
+              ${participant.correct_answers}/${participant.total_questions} correctas
               <br>
               ${participant.percentage.toFixed(1)}% precisión
             </div>
@@ -1278,6 +1316,7 @@ async function loadLeaderboard(quizId) {
     `;
   }
 }
+
 
 // Reemplaza tu loadResponsesTable por esta versión.
 // Usa el endpoint /api/quizzes/{quiz_id}/responses si está disponible (más eficiente).

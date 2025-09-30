@@ -401,6 +401,80 @@
       .brand-logo{height: 24px;}
       .qr-section{margin: 24px 0; padding: 20px;}
     }
+
+    .ranking-card{
+      background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+      border: 2px solid var(--primary-blue);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 16px 0;
+      text-align: center;
+    }
+
+    .my-rank{
+      font-size: 48px;
+      font-weight: 800;
+      color: var(--primary-blue);
+      margin: 8px 0;
+    }
+
+    .rank-gold{ color: #ffd700; }
+    .rank-silver{ color: #c0c0c0; }
+    .rank-bronze{ color: #cd7f32; }
+
+    .rank-details{
+      color: var(--text-secondary);
+      margin: 8px 0;
+    }
+
+    .top-players{
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 2px solid var(--border);
+    }
+
+    .top-player{
+      display: flex;
+      justify-content: space-between;
+      padding: 12px;
+      margin: 8px 0;
+      background: var(--bg-secondary);
+      border-radius: 8px;
+    }
+
+    .refresh-btn{
+      position: fixed;
+      bottom: 80px;
+      right: 20px;
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--primary-blue), #2563eb);
+      color: white;
+      border: none;
+      box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+      cursor: pointer;
+      font-size: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 999;
+      transition: all 0.3s ease;
+    }
+
+    .refresh-btn:hover{
+      transform: scale(1.1) rotate(180deg);
+      box-shadow: 0 6px 20px rgba(59, 130, 246, 0.6);
+    }
+
+    .refresh-btn.spinning{
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin{
+      from{ transform: rotate(0deg); }
+      to{ transform: rotate(360deg); }
+    }
   </style>
 </head>
 <body>
@@ -460,11 +534,17 @@
         <div id="quizLoading" class="loading" style="display:none;">Cargando quizzes...</div>
         <div id="quizError" class="error" style="display:none;"></div>
         
-        <div id="quizList" class="quiz-list"></div>
+      <div id="quizList" class="quiz-list"></div>
 
         <div id="emptyState" class="empty-state" style="display:none;">
           <h3>No hay quizzes activos</h3>
           <p>No se encontraron quizzes disponibles en este momento.<br>Por favor, vuelve más tarde.</p>
+        </div>
+
+        <!-- NUEVO: Ranking Section -->
+        <div id="rankingSection" class="qr-section" style="display:none;">
+          <h3 class="qr-title">🏆 Mi Posición en el Ranking</h3>
+          <div id="rankingContent"></div>
         </div>
 
         <!-- QR Code Section -->
@@ -496,7 +576,7 @@
   <!-- QR Code Library -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
 
-  <script>
+<script>
   // Configuración de la API
 const API_BASE_URL = 'https://quiz-system-sfrf.onrender.com';
 
@@ -523,6 +603,8 @@ const qrSection = document.getElementById('qrSection');
 const qrCode = document.getElementById('qrCode');
 const qrUniText = document.getElementById('qrUniText');
 const logoutBtn = document.getElementById('logoutBtn');
+const rankingSection = document.getElementById('rankingSection');
+const rankingContent = document.getElementById('rankingContent');
 
 // Event Listeners
 uniInput.addEventListener('input', handleUniInput);
@@ -530,41 +612,32 @@ nameInput.addEventListener('input', handleNameInput);
 loginBtn.addEventListener('click', handleLogin);
 logoutBtn.addEventListener('click', handleLogout);
 
-// =====================
 // SESSION MANAGEMENT
-// =====================
-
-// Save user session to localStorage
 function saveUserSession(user) {
   const sessionData = {
     user: user,
     timestamp: Date.now(),
-    expiryTime: Date.now() + (7 * 24 * 60 * 60 * 1000) // 7 days
+    expiryTime: Date.now() + (7 * 24 * 60 * 60 * 1000)
   };
   localStorage.setItem('conectahoot_session', JSON.stringify(sessionData));
   
-  // Also save as cookie
   const expiryDate = new Date();
-  expiryDate.setTime(expiryDate.getTime() + (7 * 24 * 60 * 60 * 1000)); // 7 days
+  expiryDate.setTime(expiryDate.getTime() + (7 * 24 * 60 * 60 * 1000));
   document.cookie = `conectahoot_user=${encodeURIComponent(JSON.stringify(user))}; expires=${expiryDate.toUTCString()}; path=/`;
 }
 
-// Load user session from localStorage or cookies
 function loadUserSession() {
   try {
-    // Try localStorage first
     const sessionData = localStorage.getItem('conectahoot_session');
     if (sessionData) {
       const parsed = JSON.parse(sessionData);
       if (parsed.expiryTime > Date.now()) {
         return parsed.user;
       } else {
-        // Session expired, clean it up
         localStorage.removeItem('conectahoot_session');
       }
     }
 
-    // Try cookies as fallback
     const cookies = document.cookie.split(';');
     for (let cookie of cookies) {
       const [name, value] = cookie.trim().split('=');
@@ -574,20 +647,17 @@ function loadUserSession() {
     }
   } catch (error) {
     console.error('Error loading session:', error);
-    // Clean up corrupted session data
     localStorage.removeItem('conectahoot_session');
     document.cookie = 'conectahoot_user=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/';
   }
   return null;
 }
 
-// Clear user session
 function clearUserSession() {
   localStorage.removeItem('conectahoot_session');
   document.cookie = 'conectahoot_user=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/';
 }
 
-// Check for existing session on page load
 function checkExistingSession() {
   const savedUser = loadUserSession();
   if (savedUser) {
@@ -597,7 +667,6 @@ function checkExistingSession() {
       showQuizList();
     }).catch((error) => {
       console.error('Error loading quizzes from session:', error);
-      // If there's an error, clear the session and show login
       clearUserSession();
       currentUser = null;
       showLoginScreen();
@@ -605,12 +674,9 @@ function checkExistingSession() {
   }
 }
 
-// Initialize session check on page load
 window.addEventListener('load', () => {
-  // Check for existing session first
   checkExistingSession();
   
-  // Animation
   document.querySelector('.app').style.opacity = '0';
   document.querySelector('.app').style.transform = 'translateY(20px)';
   setTimeout(() => {
@@ -620,7 +686,6 @@ window.addEventListener('load', () => {
   }, 100);
 });
 
-// Enter key support
 uniInput.addEventListener('keypress', (e) => {
   if (e.key === 'Enter' && !loginBtn.disabled) {
     if (nameInput.style.display === 'none') {
@@ -639,9 +704,6 @@ function handleUniInput() {
   const uni = uniInput.value.trim();
   loginBtn.disabled = uni.length === 0;
   hideError();
-  
-  // Solo permitir números y letras
-  // uniInput.value = uni.replace(/[^0-9a-zA-Z]/g, '');
 }
 
 function handleNameInput() {
@@ -666,11 +728,9 @@ async function handleLogin() {
   try {
     console.log('Attempting to login with UNI:', uni);
     
-    // Obtener usuario existente
     let user = await getUser(uni);
     
     if (!user) {
-      // Usuario no existe, no se permite registrar
       showError('Usuario no encontrado. No puedes registrarte aquí.');
       return;
     }
@@ -678,7 +738,6 @@ async function handleLogin() {
     console.log('User authenticated:', user);
     currentUser = user;
     
-    // Guardar sesión del usuario
     saveUserSession(user);
     
     await loadQuizzes();
@@ -703,7 +762,6 @@ function handleLogout() {
 async function getUser(uni) {
   try {
     console.log('Fetching user with UNI:', uni);
-    // FIXED: Use the correct endpoint for getting user by UNI
     const response = await fetch(`${API_BASE_URL}/api/users/by-uni/${encodeURIComponent(uni)}`);
     
     console.log('API Response status:', response.status);
@@ -714,7 +772,7 @@ async function getUser(uni) {
       return user;
     } else if (response.status === 404) {
       console.log('User not found');
-      return null; // Usuario no existe
+      return null;
     } else {
       const errorText = await response.text();
       console.error('API Error:', response.status, errorText);
@@ -722,34 +780,6 @@ async function getUser(uni) {
     }
   } catch (error) {
     console.error('Error obteniendo usuario:', error);
-    throw error;
-  }
-}
-
-async function createUser(uni, name) {
-  try {
-    console.log('Creating user:', { uni, name });
-    const response = await fetch(`${API_BASE_URL}/api/users/`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ uni, name })
-    });
-
-    console.log('Create user response status:', response.status);
-
-    if (response.ok) {
-      const user = await response.json();
-      console.log('User created:', user);
-      return user;
-    } else {
-      const errorData = await response.text();
-      console.error('Error creating user:', response.status, errorData);
-      throw new Error(`Error creando usuario: ${response.status} - ${errorData}`);
-    }
-  } catch (error) {
-    console.error('Error creando usuario:', error);
     throw error;
   }
 }
@@ -766,7 +796,6 @@ async function loadQuizzes() {
       availableQuizzes = await response.json();
       console.log('Quizzes loaded:', availableQuizzes.length);
       
-      // Cargar estado de participación para cada quiz
       const quizzesWithStatus = await Promise.all(
         availableQuizzes.map(async (quiz) => {
           try {
@@ -787,6 +816,10 @@ async function loadQuizzes() {
       
       availableQuizzes = quizzesWithStatus;
       displayQuizzes();
+      
+      // NUEVO: Cargar rankings
+      await loadAllRankings();
+      
     } else {
       const errorText = await response.text();
       console.error('Error loading quizzes:', response.status, errorText);
@@ -799,6 +832,89 @@ async function loadQuizzes() {
   } finally {
     quizLoading.style.display = 'none';
   }
+}
+
+// NUEVO: Función para cargar rankings
+async function loadAllRankings() {
+  try {
+    let hasAnyRanking = false;
+    let rankingHtml = '';
+    
+    for (const quiz of availableQuizzes) {
+      if (quiz.participationStatus.status === 'completed') {
+        const response = await fetch(`${API_BASE_URL}/api/users/${encodeURIComponent(currentUser.uni)}/quiz/${quiz.id}/ranking`);
+        
+        if (response.ok) {
+          const ranking = await response.json();
+          
+          if (ranking.has_completed) {
+            hasAnyRanking = true;
+            
+            let rankClass = '';
+            if (ranking.user_rank === 1) rankClass = 'rank-gold';
+            else if (ranking.user_rank === 2) rankClass = 'rank-silver';
+            else if (ranking.user_rank === 3) rankClass = 'rank-bronze';
+            
+            rankingHtml += `
+              <div class="ranking-card">
+                <h4 style="margin: 0 0 8px 0; color: var(--text-primary);">${quiz.title}</h4>
+                <div class="my-rank ${rankClass}">#${ranking.user_rank}</div>
+                <div class="rank-details">
+                  de ${ranking.total_participants} participantes
+                  <br>
+                  Score: ${ranking.user_score.toLocaleString()} puntos
+                </div>
+                
+                ${ranking.top_3 && ranking.top_3.length > 0 ? `
+                  <div class="top-players">
+                    <h5 style="margin: 0 0 12px 0; color: var(--text-secondary);">Top 3:</h5>
+                    ${ranking.top_3.map((player, idx) => `
+                      <div class="top-player">
+                        <span><strong>#${idx + 1}</strong> ${player.user_name}</span>
+                        <span>${player.total_score.toLocaleString()} pts</span>
+                      </div>
+                    `).join('')}
+                  </div>
+                ` : ''}
+              </div>
+            `;
+          }
+        }
+      }
+    }
+    
+    if (hasAnyRanking) {
+      rankingContent.innerHTML = rankingHtml;
+      rankingSection.style.display = 'block';
+    } else {
+      rankingSection.style.display = 'none';
+    }
+    
+  } catch (error) {
+    console.error('Error loading rankings:', error);
+  }
+}
+
+// NUEVO: Botón de refresh
+function createRefreshButton() {
+  const existingBtn = document.getElementById('refreshBtn');
+  if (existingBtn) return;
+  
+  const refreshBtn = document.createElement('button');
+  refreshBtn.id = 'refreshBtn';
+  refreshBtn.className = 'refresh-btn';
+  refreshBtn.innerHTML = '🔄';
+  refreshBtn.title = 'Actualizar datos';
+  
+  refreshBtn.onclick = async () => {
+    refreshBtn.classList.add('spinning');
+    await loadQuizzes();
+    setTimeout(() => {
+      refreshBtn.classList.remove('spinning');
+    }, 1000);
+  };
+  
+  document.body.appendChild(refreshBtn);
 }
 
 function displayQuizzes() {
@@ -869,15 +985,12 @@ function createQuizCard(quiz) {
 }
 
 function generateQRCode(uni) {
-  // Clear previous QR code
   qrCode.innerHTML = '';
   
   try {
-    // Create canvas element
     const canvas = document.createElement('canvas');
     qrCode.appendChild(canvas);
     
-    // Generate QR code using QRious
     new QRious({
       element: canvas,
       value: uni,
@@ -897,7 +1010,6 @@ function generateQRCode(uni) {
 function startQuiz(quizId) {
   console.log('Starting quiz:', quizId, 'for user:', currentUser.uni);
   
-  // Redirigir a la vista del quiz
   const params = new URLSearchParams({
     uni: currentUser.uni,
     quiz_id: quizId
@@ -914,17 +1026,18 @@ function showQuizList() {
   userName.textContent = currentUser.name;
   userUni.textContent = currentUser.uni;
   
-  // Show QR section and generate QR code
   qrSection.style.display = 'block';
   qrUniText.textContent = currentUser.uni;
   generateQRCode(currentUser.uni);
+  
+  // NUEVO: Crear botón de refresh
+  createRefreshButton();
 }
 
 function showLoginScreen() {
   quizListScreen.style.display = 'none';
   loginScreen.style.display = 'block';
   
-  // Reset form
   uniInput.value = '';
   nameInput.value = '';
   nameInput.style.display = 'none';
@@ -932,8 +1045,11 @@ function showLoginScreen() {
   loginBtn.disabled = true;
   hideError();
   
-  // Hide QR section
   qrSection.style.display = 'none';
+  rankingSection.style.display = 'none';
+  
+  const refreshBtn = document.getElementById('refreshBtn');
+  if (refreshBtn) refreshBtn.remove();
   
   currentUser = null;
   availableQuizzes = [];
@@ -948,5 +1064,7 @@ function hideError() {
   loginError.style.display = 'none';
 }
   </script>
+
+
 </body>
 </html>

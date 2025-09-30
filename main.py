@@ -235,10 +235,10 @@ class ParticipationOut(BaseModel):
     completed: bool
     started_at: datetime
     completed_at: Optional[datetime]
+    total_score: int = 0  # NUEVO: Score basado en tiempo
     
     class Config:
         from_attributes = True
-
 # Create tables
 try:
     Base.metadata.create_all(bind=engine)
@@ -861,7 +861,7 @@ def update_question(question_id: int, question_update: QuestionUpdate, db: Sessi
         logger.error(f"Error updating question: {e}")
         raise HTTPException(status_code=500, detail="Error al actualizar pregunta")
     
-    
+
 
 @app.delete("/api/questions/{question_id}")
 def delete_question(question_id: int, db: Session = Depends(get_db)):
@@ -1006,7 +1006,6 @@ def submit_answer(participation_id: int, answer: SubmitAnswer, db: Session = Dep
         if participation.completed:
             raise HTTPException(status_code=400, detail="Esta participación ya está completada")
         
-        # Revisar si ya contestó esa pregunta
         existing_response = db.query(UserResponse).filter(
             UserResponse.participation_id == participation_id,
             UserResponse.question_id == answer.question_id
@@ -1015,7 +1014,6 @@ def submit_answer(participation_id: int, answer: SubmitAnswer, db: Session = Dep
         if existing_response:
             raise HTTPException(status_code=400, detail="Ya respondiste esta pregunta")
         
-        # Obtener la pregunta
         question = db.query(Question).filter(Question.id == answer.question_id).first()
         if not question:
             raise HTTPException(status_code=400, detail="Pregunta no válida")
@@ -1023,21 +1021,18 @@ def submit_answer(participation_id: int, answer: SubmitAnswer, db: Session = Dep
         is_correct = False
         
         if question.question_type == QuestionType.OPEN_ENDED:
-            # Para preguntas abiertas, no evaluamos corrección
             user_response = UserResponse(
                 participation_id=participation_id,
                 question_id=answer.question_id,
                 answer_id=None,
                 open_answer_text=answer.open_answer_text,
                 response_time=answer.response_time,
-                is_correct=False  # Las preguntas abiertas no se califican automáticamente
+                is_correct=False
             )
         else:
-            # Para preguntas de opción múltiple e imágenes
             if not answer.answer_id:
                 raise HTTPException(status_code=400, detail="answer_id requerido para este tipo de pregunta")
             
-            # Verificar respuesta correcta
             correct_answers = db.query(Answer).filter(
                 Answer.question_id == answer.question_id,
                 Answer.is_correct == True
@@ -1057,7 +1052,6 @@ def submit_answer(participation_id: int, answer: SubmitAnswer, db: Session = Dep
         
         db.add(user_response)
         
-        # Actualizar score solo para preguntas que se califican automáticamente
         if is_correct:
             participation.score += 1
         
@@ -1075,7 +1069,90 @@ def submit_answer(participation_id: int, answer: SubmitAnswer, db: Session = Dep
         db.rollback()
         logger.error(f"Error submitting answer: {e}")
         raise HTTPException(status_code=500, detail="Error al enviar respuesta")
-
+    
+@app.get("/api/users/{uni}/quiz/{quiz_id}/ranking")
+def get_user_ranking(uni: str, quiz_id: int, db: Session = Depends(get_db)):
+    try:
+        user = db.query(User).filter(User.uni == uni).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        
+        # Obtener participación del usuario
+        user_participation = db.query(Participation).filter(
+            Participation.user_id == user.id,
+            Participation.quiz_id == quiz_id,
+            Participation.completed == True
+        ).first()
+        
+        if not user_participation:
+            return {
+                "has_completed": False,
+                "message": "No has completado este quiz"
+            }
+        
+        # Calcular score del usuario (solo preguntas no abiertas)
+        user_responses = db.query(UserResponse).join(Question).filter(
+            UserResponse.participation_id == user_participation.id,
+            Question.question_type != 'open_ended'
+        ).all()
+        
+        user_total_score = 0
+        for response in user_responses:
+            if response.is_correct:
+                question = db.query(Question).filter(Question.id == response.question_id).first()
+                time_limit_ms = question.time_limit * 1000
+                time_bonus = max(0, time_limit_ms - response.response_time)
+                user_total_score += 1000 + time_bonus
+        
+        # Obtener todas las participaciones completadas del quiz
+        all_participations = db.query(Participation).filter(
+            Participation.quiz_id == quiz_id,
+            Participation.completed == True
+        ).all()
+        
+        # Calcular scores de todos
+        rankings = []
+        for participation in all_participations:
+            responses = db.query(UserResponse).join(Question).filter(
+                UserResponse.participation_id == participation.id,
+                Question.question_type != 'open_ended'
+            ).all()
+            
+            total_score = 0
+            for response in responses:
+                if response.is_correct:
+                    question = db.query(Question).filter(Question.id == response.question_id).first()
+                    time_limit_ms = question.time_limit * 1000
+                    time_bonus = max(0, time_limit_ms - response.response_time)
+                    total_score += 1000 + time_bonus
+            
+            rankings.append({
+                "user_id": participation.user_id,
+                "user_name": participation.user.name,
+                "user_uni": participation.user.uni,
+                "total_score": total_score,
+                "correct_answers": participation.score
+            })
+        
+        # Ordenar por score
+        rankings.sort(key=lambda x: x["total_score"], reverse=True)
+        
+        # Encontrar posición del usuario
+        user_rank = next((i + 1 for i, r in enumerate(rankings) if r["user_uni"] == uni), None)
+        
+        return {
+            "has_completed": True,
+            "user_rank": user_rank,
+            "total_participants": len(rankings),
+            "user_score": user_total_score,
+            "top_3": rankings[:3]
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting user ranking: {e}")
+        raise HTTPException(status_code=500, detail="Error al obtener ranking")
 
 @app.post("/api/participate/{participation_id}/complete")
 def complete_participation(participation_id: int, db: Session = Depends(get_db)):
@@ -1092,6 +1169,20 @@ def complete_participation(participation_id: int, db: Session = Depends(get_db))
                 "percentage": round((participation.score / participation.total_questions) * 100, 2) if participation.total_questions > 0 else 0
             }
         
+        # Calcular score total (solo preguntas no abiertas)
+        responses = db.query(UserResponse).join(Question).filter(
+            UserResponse.participation_id == participation_id,
+            Question.question_type != 'open_ended'
+        ).all()
+        
+        total_score = 0
+        for response in responses:
+            if response.is_correct:
+                question = db.query(Question).filter(Question.id == response.question_id).first()
+                time_limit_ms = question.time_limit * 1000
+                time_bonus = max(0, time_limit_ms - response.response_time)
+                total_score += 1000 + time_bonus
+        
         participation.completed = True
         participation.completed_at = datetime.utcnow()
         db.commit()
@@ -1102,7 +1193,8 @@ def complete_participation(participation_id: int, db: Session = Depends(get_db))
             "message": "Participación completada exitosamente",
             "score": participation.score,
             "total_questions": participation.total_questions,
-            "percentage": round(percentage, 2)
+            "percentage": round(percentage, 2),
+            "total_score": total_score
         }
     except HTTPException:
         raise
@@ -1110,6 +1202,7 @@ def complete_participation(participation_id: int, db: Session = Depends(get_db))
         db.rollback()
         logger.error(f"Error completing participation: {e}")
         raise HTTPException(status_code=500, detail="Error al completar participación")
+
 
 # Reemplaza la función get_all_participations en tu main.py
 
