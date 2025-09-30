@@ -1443,11 +1443,11 @@ async function deleteResponse(participationId, questionId) {
 
 
 
+// Reemplazar la función handleResponsesQuizChange COMPLETA
 async function handleResponsesQuizChange(e) {
   const quizId = e.target.value;
   const container = document.getElementById('responsesListContainer');
   const exportBtn = document.getElementById('exportResponsesBtn');
-  // REMOVIDO: const deleteAllBtn = document.getElementById('deleteAllResponsesBtn');
   
   if (!container) {
     console.error('FATAL: #responsesListContainer element not found in DOM!');
@@ -1458,7 +1458,6 @@ async function handleResponsesQuizChange(e) {
   if (!quizId) {
     container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--text-muted);">Selecciona un quiz para ver las respuestas</div>';
     exportBtn.disabled = true;
-    // REMOVIDO: deleteAllBtn.disabled = true;
     currentFilteredResponses = [];
     return;
   }
@@ -1485,22 +1484,31 @@ async function handleResponsesQuizChange(e) {
         </div>
       `;
       exportBtn.disabled = true;
-      // REMOVIDO: deleteAllBtn.disabled = true;
       return;
     }
     
-    // Ordenar respuestas
-    responses.sort((a, b) => {
-      if (a.user_uni !== b.user_uni) {
-        return String(a.user_uni).localeCompare(String(b.user_uni));
+    // AGRUPAR POR USUARIO
+    const groupedByUser = {};
+    responses.forEach(r => {
+      const key = r.user_uni;
+      if (!groupedByUser[key]) {
+        groupedByUser[key] = {
+          user_name: r.user_name,
+          user_uni: r.user_uni,
+          participation_id: r.participation_id,
+          total_questions: 0,
+          correct_answers: 0,
+          total_time: 0,
+          completed_at: r.completed_at
+        };
       }
-      return (a.question_order || 0) - (b.question_order || 0);
+      groupedByUser[key].total_questions++;
+      if (r.is_correct) groupedByUser[key].correct_answers++;
+      groupedByUser[key].total_time += (r.response_time || 0);
     });
     
-    console.log('About to render, container is:', container);
-    renderResponsesTable(responses, container);
+    renderGroupedResponsesTable(groupedByUser, container);
     exportBtn.disabled = false;
-    // REMOVIDO: deleteAllBtn.disabled = false;
     
   } catch (error) {
     console.error('Error loading responses:', error);
@@ -1511,11 +1519,96 @@ async function handleResponsesQuizChange(e) {
       </div>
     `;
     exportBtn.disabled = true;
-    // REMOVIDO: deleteAllBtn.disabled = true;
     currentFilteredResponses = [];
   }
 }
 
+// NUEVA FUNCIÓN: Renderizar tabla agrupada
+function renderGroupedResponsesTable(groupedData, container) {
+  const users = Object.values(groupedData);
+  
+  // Ordenar por porcentaje correcto
+  users.sort((a, b) => {
+    const percA = (a.correct_answers / a.total_questions) * 100;
+    const percB = (b.correct_answers / b.total_questions) * 100;
+    return percB - percA;
+  });
+  
+  const tableRows = users.map(user => {
+    const percentage = ((user.correct_answers / user.total_questions) * 100).toFixed(1);
+    const avgTime = (user.total_time / user.total_questions).toFixed(0);
+    
+    return `
+      <tr>
+        <td><strong>${escapeHtml(user.user_name)}</strong></td>
+        <td>${escapeHtml(user.user_uni)}</td>
+        <td>${user.total_questions}</td>
+        <td>${user.correct_answers}</td>
+        <td><strong>${percentage}%</strong></td>
+        <td class="response-time">${avgTime}ms</td>
+        <td>${formatDate(user.completed_at)}</td>
+        <td>
+          <button class="btn btn-small btn-primary" onclick="viewResponseDetails(${user.participation_id})" title="Ver detalles">
+            👁️ Detalles
+          </button>
+          <button class="btn btn-small btn-danger" onclick="deleteUserParticipation(${user.participation_id}, '${user.user_name}')" title="Eliminar">
+            🗑️
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+  
+  container.innerHTML = `
+    <div class="responses-table">
+      <p style="margin-bottom: 16px; color: var(--text-secondary);">
+        Mostrando <strong>${users.length}</strong> participantes únicos
+      </p>
+      <table class="table table-striped table-compact">
+        <thead>
+          <tr>
+            <th>Usuario</th>
+            <th>UNI</th>
+            <th>Preguntas</th>
+            <th>Correctas</th>
+            <th>Porcentaje</th>
+            <th>Tiempo Promedio</th>
+            <th>Fecha</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>${tableRows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+// NUEVA FUNCIÓN: Eliminar participación de usuario
+async function deleteUserParticipation(participationId, userName) {
+  const confirmMsg = `¿Eliminar la participación de ${userName}?\n\n⚠️ Esta acción no se puede deshacer.`;
+  
+  if (!confirm(confirmMsg)) return;
+  
+  try {
+    const deleteResponse = await fetch(`${API_BASE_URL}/api/participations/${participationId}`, {
+      method: 'DELETE'
+    });
+    
+    if (deleteResponse.ok) {
+      showSuccess('Participación eliminada exitosamente');
+      const quizSelect = document.getElementById('responsesQuizSelect');
+      if (quizSelect.value) {
+        handleResponsesQuizChange({ target: quizSelect });
+      }
+    } else {
+      throw new Error('Error al eliminar');
+    }
+    
+  } catch (error) {
+    console.error('Error:', error);
+    alert('No se pudo eliminar la participación');
+  }
+}
 
 
 // NUEVA FUNCIÓN: Eliminar respuesta específica
@@ -1972,6 +2065,7 @@ async function loadQuizzes() {
   }
 }
 
+// Reemplazar la función loadUsers COMPLETA
 async function loadUsers() {
   try {
     const response = await fetch(`${API_BASE_URL}/api/users/`);
@@ -1983,32 +2077,81 @@ async function loadUsers() {
     }
 
     const html = `
-      <table class="table">
-        <thead>
-          <tr><th>UNI</th><th>Nombre</th><th>Fecha Registro</th><th>Acciones</th></tr>
-        </thead>
-        <tbody>
-          ${users.map(user => `
-            <tr>
-              <td>${user.uni}</td>
-              <td>${user.name}</td>
-              <td>${new Date(user.created_at).toLocaleDateString()}</td>
-              <td>
-                <button class="btn btn-small btn-primary" onclick="editUser(${user.id})">Editar</button>
-                <button class="btn btn-small btn-danger" onclick="deleteUser(${user.id})">Eliminar</button>
-              </td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
+      <div style="margin-bottom: 20px;">
+        <input 
+          type="text" 
+          id="userSearchInput" 
+          class="form-input" 
+          placeholder="🔍 Buscar por nombre o UNI..." 
+          style="max-width: 400px;"
+        >
+      </div>
+      <div id="usersTableContainer">
+        ${renderUsersTable(users)}
+      </div>
     `;
 
     document.getElementById('usersList').innerHTML = html;
+    
+    // Agregar listener de búsqueda
+    document.getElementById('userSearchInput').addEventListener('input', (e) => {
+      filterUsers(users, e.target.value);
+    });
 
   } catch (error) {
     console.error('Error loading users:', error);
     document.getElementById('usersList').innerHTML = '<div class="error">Error al cargar usuarios</div>';
   }
+}
+
+// NUEVA FUNCIÓN: Renderizar tabla de usuarios
+function renderUsersTable(users) {
+  if (users.length === 0) {
+    return '<p style="text-align: center; padding: 40px; color: var(--text-muted);">No se encontraron usuarios</p>';
+  }
+  
+  return `
+    <table class="table">
+      <thead>
+        <tr>
+          <th>UNI</th>
+          <th>Nombre</th>
+          <th>Fecha Registro</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${users.map(user => `
+          <tr>
+            <td><strong>${user.uni}</strong></td>
+            <td>${user.name}</td>
+            <td>${new Date(user.created_at).toLocaleDateString()}</td>
+            <td>
+              <button class="btn btn-small btn-primary" onclick="editUser(${user.id})">Editar</button>
+              <button class="btn btn-small btn-danger" onclick="deleteUser(${user.id})">Eliminar</button>
+            </td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+// NUEVA FUNCIÓN: Filtrar usuarios
+function filterUsers(allUsers, searchTerm) {
+  const term = searchTerm.toLowerCase().trim();
+  
+  if (term === '') {
+    document.getElementById('usersTableContainer').innerHTML = renderUsersTable(allUsers);
+    return;
+  }
+  
+  const filtered = allUsers.filter(user => 
+    user.name.toLowerCase().includes(term) || 
+    user.uni.toLowerCase().includes(term)
+  );
+  
+  document.getElementById('usersTableContainer').innerHTML = renderUsersTable(filtered);
 }
 
 async function editUser(userId) {

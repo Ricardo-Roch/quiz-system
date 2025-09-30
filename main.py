@@ -830,7 +830,9 @@ def update_question(question_id: int, question_update: QuestionUpdate, db: Sessi
         # Actualizar respuestas si se envían
         if question_update.answers is not None:
             # Validar según tipo de pregunta
-            if question_update.question_type != QuestionType.OPEN_ENDED:
+            question_type = question_update.question_type if question_update.question_type is not None else question.question_type
+            
+            if question_type != QuestionType.OPEN_ENDED:
                 correct_answers = [a for a in question_update.answers if a.is_correct]
                 if len(correct_answers) < 1:
                     raise HTTPException(status_code=400, detail="Debe haber al menos una respuesta correcta")
@@ -852,15 +854,18 @@ def update_question(question_id: int, question_update: QuestionUpdate, db: Sessi
         
         db.commit()
         db.refresh(question)
+        
         return {"message": "Pregunta actualizada exitosamente", "question_id": question_id}
         
     except HTTPException:
+        db.rollback()
         raise
     except Exception as e:
         db.rollback()
         logger.error(f"Error updating question: {e}")
-        raise HTTPException(status_code=500, detail="Error al actualizar pregunta")
-    
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error al actualizar pregunta: {str(e)}")
 
 
 @app.delete("/api/questions/{question_id}")
