@@ -846,6 +846,8 @@
           </div>
         </div>
       </div>
+
+
       <!-- Users Page -->
       <div id="usersPage" class="page hidden">
         <div class="page-header">
@@ -1189,6 +1191,11 @@ async function loadResponsesModule() {
 }
 // NUEVA FUNCIÓN: Renderizar tabla de respuestas con acciones CRUD
 function renderResponsesTable(responses, container) {
+  if (!container) {
+    console.error('Container element not found');
+    return;
+  }
+  
   const tableRows = responses.map(response => {
     const correctClass = response.is_correct ? 'correct-answer' : 'incorrect-answer';
     const correctIcon = response.is_correct ? '✓' : '✗';
@@ -1235,10 +1242,16 @@ function renderResponsesTable(responses, container) {
     </div>
   `;
 }
+
 async function handleResponsesQuizChange(e) {
   const quizId = e.target.value;
   const container = document.getElementById('responsesListContainer');
   const exportBtn = document.getElementById('exportResponsesBtn');
+  
+  if (!container) {
+    console.error('Container #responsesListContainer not found');
+    return;
+  }
   
   if (!quizId) {
     container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--text-muted);">Selecciona un quiz para ver las respuestas</div>';
@@ -1250,24 +1263,37 @@ async function handleResponsesQuizChange(e) {
   container.innerHTML = '<div class="loading">Cargando respuestas...</div>';
   
   try {
+    console.log(`Fetching responses for quiz ${quizId}...`);
     const response = await fetch(`${API_BASE_URL}/api/quizzes/${quizId}/responses`);
     
     if (!response.ok) {
-      throw new Error('Error al obtener respuestas');
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
     
     const responses = await response.json();
+    console.log(`Received ${responses.length} responses:`, responses);
+    
     currentFilteredResponses = responses;
     
     if (responses.length === 0) {
       container.innerHTML = `
-        <div class="empty-table">
-          No hay respuestas registradas para este quiz
+        <div class="empty-table" style="text-align: center; padding: 40px; color: var(--text-muted);">
+          <div style="font-size: 48px; margin-bottom: 16px;">📋</div>
+          <h4>No hay respuestas registradas</h4>
+          <p>Este quiz aún no tiene respuestas de participantes.</p>
         </div>
       `;
       exportBtn.disabled = true;
       return;
     }
+    
+    // Ordenar respuestas por usuario y pregunta
+    responses.sort((a, b) => {
+      if (a.user_uni !== b.user_uni) {
+        return String(a.user_uni).localeCompare(String(b.user_uni));
+      }
+      return (a.question_order || 0) - (b.question_order || 0);
+    });
     
     // Renderizar tabla
     renderResponsesTable(responses, container);
@@ -1276,26 +1302,33 @@ async function handleResponsesQuizChange(e) {
   } catch (error) {
     console.error('Error loading responses:', error);
     container.innerHTML = `
-      <div class="error">Error al cargar respuestas: ${error.message}</div>
+      <div class="error">
+        <strong>Error al cargar respuestas:</strong><br>
+        ${error.message}
+      </div>
     `;
     exportBtn.disabled = true;
     currentFilteredResponses = [];
   }
 }
 
+
 // NUEVA FUNCIÓN: Eliminar respuesta específica
 async function deleteResponse(participationId, questionId) {
   if (!confirm('¿Eliminar esta respuesta? Esta acción no se puede deshacer.')) return;
   
   try {
-    // Endpoint: eliminar participación completa o respuesta específica
     const response = await fetch(`${API_BASE_URL}/api/participations/${participationId}`, {
       method: 'DELETE'
     });
     
     if (response.ok) {
       showSuccess('Respuesta eliminada exitosamente');
-      handleResponsesQuizChange({ target: document.getElementById('responsesQuizSelect') });
+      // Recargar las respuestas del quiz actual
+      const quizSelect = document.getElementById('responsesQuizSelect');
+      if (quizSelect.value) {
+        handleResponsesQuizChange({ target: quizSelect });
+      }
     } else {
       throw new Error('Error al eliminar');
     }
@@ -1305,7 +1338,6 @@ async function deleteResponse(participationId, questionId) {
     alert('No se pudo eliminar la respuesta');
   }
 }
-
 // NUEVA FUNCIÓN: Exportar respuestas filtradas
 function exportFilteredResponses() {
   if (currentFilteredResponses.length === 0) {
@@ -1341,7 +1373,6 @@ function exportFilteredResponses() {
   
   showSuccess('CSV exportado exitosamente');
 }
-
 async function loadDashboard() {
   try {
     // Cargar estadísticas básicas
