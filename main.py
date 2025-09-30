@@ -815,13 +815,24 @@ def update_question(question_id: int, question_update: QuestionUpdate, db: Sessi
         if not question:
             raise HTTPException(status_code=404, detail="Pregunta no encontrada")
         
+        # Verificar si hay respuestas de usuarios asociadas
+        existing_responses = db.query(UserResponse).filter(
+            UserResponse.question_id == question_id
+        ).first()
+        
+        if existing_responses:
+            raise HTTPException(
+                status_code=400, 
+                detail="No se puede editar esta pregunta porque ya tiene respuestas de usuarios. Considera crear una nueva pregunta o desactivar el quiz primero."
+            )
+        
         # Actualizar campos básicos
         if question_update.question_text is not None:
             question.question_text = question_update.question_text
         if question_update.question_order is not None:
             question.question_order = question_update.question_order
         if question_update.time_limit is not None:
-            question.time_limit = question_update.time_limit
+            question.question_limit = question_update.time_limit
         if question_update.question_type is not None:
             question.question_type = question_update.question_type
         if question_update.image_url is not None:
@@ -837,11 +848,12 @@ def update_question(question_id: int, question_update: QuestionUpdate, db: Sessi
                 if len(correct_answers) < 1:
                     raise HTTPException(status_code=400, detail="Debe haber al menos una respuesta correcta")
             
-            # Eliminar respuestas viejas
+            # CRÍTICO: Eliminar respuestas viejas SIN verificar user_responses
+            # porque ya verificamos arriba que no existen
             db.query(Answer).filter(Answer.question_id == question_id).delete(synchronize_session=False)
             db.flush()
             
-            # Insertar nuevas
+            # Insertar nuevas respuestas
             for answer in question_update.answers:
                 db_answer = Answer(
                     question_id=question_id,
@@ -866,7 +878,6 @@ def update_question(question_id: int, question_update: QuestionUpdate, db: Sessi
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Error al actualizar pregunta: {str(e)}")
-
 
 @app.delete("/api/questions/{question_id}")
 def delete_question(question_id: int, db: Session = Depends(get_db)):
