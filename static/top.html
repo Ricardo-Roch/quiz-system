@@ -1,0 +1,950 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Top Ranking - Conectahoot</title>
+  <style>
+    :root {
+      --gold: #fff;
+      --silver: #fff;
+      --bronze: #fff;
+    }
+    
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      font-family: 'Montserrat', Inter, system-ui, -apple-system, sans-serif;
+      background: #ffffff;
+      min-height: 100vh;
+      padding: 20px;
+      color: #0056a8;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    
+    .header {
+      text-align: center;
+      margin-bottom: 40px;
+      animation: fadeInDown 0.8s ease;
+    }
+    
+    .logo-section {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+    
+    .logo {
+      height: 80px;
+      width: auto;
+      filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.2));
+      cursor: pointer;
+      transition: all 0.3s ease;
+      animation: float 3s ease-in-out infinite;
+    }
+    
+    .logo:hover {
+      transform: scale(1.1) rotate(5deg);
+      filter: drop-shadow(0 6px 16px rgba(255, 255, 255, 0.4));
+    }
+    
+    .title {
+      font-size: 48px;
+      font-weight: 900;
+      color: #0056a8;
+      text-shadow: 0 4px 12px rgba(13, 59, 102, 0.2);
+      margin-bottom: 10px;
+      letter-spacing: -1px;
+      animation: pulse 2s ease-in-out infinite;
+    }
+    
+    .subtitle {
+      font-size: 18px;
+      color: #0056a8;
+      font-weight: 600;
+      animation: fadeIn 1.5s ease;
+    }
+    
+    .controls {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      align-items: center;
+      margin-bottom: 40px;
+      flex-wrap: wrap;
+      animation: fadeIn 1s ease 0.2s backwards;
+    }
+    
+    .quiz-select {
+      padding: 16px 24px;
+      border-radius: 12px;
+      border: 3px solid #0056a8;
+      background: rgba(255, 255, 255, 0.95);
+      font-size: 16px;
+      font-weight: 700;
+      color: #0056a8;
+      cursor: pointer;
+      min-width: 300px;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 12px rgba(13, 59, 102, 0.15);
+    }
+    
+    .quiz-select:focus {
+      outline: none;
+      transform: scale(1.05);
+      box-shadow: 0 6px 20px rgba(13, 59, 102, 0.3);
+    }
+    
+    .refresh-btn {
+      position: fixed;
+      bottom: 80px;
+      right: 20px;
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      border: 3px solid #0056a8;
+      background: transparent;
+      color: #0056a8;
+      font-size: 32px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      animation: slideInRight 0.5s ease;
+    }
+    
+    .refresh-btn:hover {
+      transform: scale(1.15) rotate(90deg);
+      border-color: rgba(13, 59, 102, 0.8);
+    }
+    
+    .refresh-btn:active {
+      transform: scale(1.05) rotate(180deg);
+    }
+    
+    .refresh-btn.spinning .icon {
+      animation: spin 0.7s linear;
+    }
+    
+    .podium {
+      display: flex;
+      justify-content: center;
+      align-items: flex-end;
+      gap: 20px;
+      margin-bottom: 60px;
+      perspective: 1000px;
+      flex-wrap: wrap;
+    }
+    
+    .podium-place {
+      background: rgba(15, 58, 97, 0.85);
+      backdrop-filter: blur(10px);
+      border-radius: 20px 20px 0 0;
+      padding: 20px 15px;
+      text-align: center;
+      min-width: 180px;
+      max-width: 280px;
+      flex: 1;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+      transition: all 0.4s ease;
+      position: relative;
+      overflow: hidden;
+      border: 2px solid rgba(13, 59, 102, 0.3);
+    }
+    
+    .podium-place:hover {
+      transform: translateY(-10px) scale(1.05);
+      box-shadow: 0 15px 40px rgba(13, 59, 102, 0.3);
+    }
+    
+    .podium-place::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 8px;
+    }
+    
+    .podium-place::after {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+      animation: shine 3s infinite;
+    }
+    
+    .podium-place.first {
+      min-height: 380px;
+      animation: growUp 1s ease 0.5s backwards, glow 2s ease-in-out infinite;
+      order: 2;
+    }
+    
+    .podium-place.first::before {
+      background: linear-gradient(90deg, #ffd700, #ffed4e);
+      box-shadow: 0 0 20px rgba(255, 215, 0, 0.6);
+    }
+    
+    .podium-place.second {
+      min-height: 330px;
+      animation: growUp 1s ease 0.3s backwards;
+      order: 1;
+    }
+    
+    .podium-place.second::before {
+      background: linear-gradient(90deg, #c0c0c0, #e8e8e8);
+    }
+    
+    .podium-place.third {
+      min-height: 280px;
+      animation: growUp 1s ease 0.4s backwards;
+      order: 3;
+    }
+    
+    .podium-place.third::before {
+      background: linear-gradient(90deg, #cd7f32, #e8a87c);
+    }
+    
+    .medal {
+      font-size: 64px;
+      margin-bottom: 12px;
+      animation: bounce 2s infinite, rotate 4s linear infinite;
+      display: inline-block;
+    }
+    
+    .rank-number {
+      font-size: 56px;
+      font-weight: 900;
+      margin-bottom: 12px;
+      line-height: 1;
+      color: white;
+      text-shadow: 2px 2px 8px rgba(255, 255, 255, 0.5);
+    }
+    
+    .participant-name {
+      font-size: 18px;
+      font-weight: 800;
+      color: white;
+      margin-bottom: 8px;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      line-height: 1.3;
+      min-height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .participant-uni {
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.9);
+      font-weight: 600;
+      margin-bottom: 16px;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      line-height: 1.3;
+    }
+    
+    .score {
+      font-size: 28px;
+      font-weight: 900;
+      color: white;
+      margin-bottom: 8px;
+      animation: countUp 0.5s ease;
+    }
+    
+    .score-label {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.8);
+      text-transform: uppercase;
+      font-weight: 700;
+      letter-spacing: 1px;
+    }
+    
+    .ranking-list {
+      background: rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(10px);
+      border: 2px solid rgba(13, 59, 102, 0.3);
+      border-radius: 20px;
+      padding: 30px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+      animation: fadeInUp 1s ease 0.8s backwards;
+    }
+    
+    .ranking-title {
+      font-size: 28px;
+      font-weight: 900;
+      color: #012546;
+      margin-bottom: 24px;
+      text-align: center;
+      animation: slideInLeft 0.8s ease;
+    }
+    
+    .ranking-item {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      padding: 16px;
+      margin-bottom: 12px;
+      background: rgba(13, 59, 102, 0.1);
+      backdrop-filter: blur(5px);
+      border: 1px solid rgba(13, 59, 102, 0.084);
+      border-radius: 12px;
+      transition: all 0.3s ease;
+      animation: slideInRight 0.5s ease backwards;
+    }
+    
+    .ranking-item:nth-child(1) { animation-delay: 1s; }
+    .ranking-item:nth-child(2) { animation-delay: 1.1s; }
+    .ranking-item:nth-child(3) { animation-delay: 1.2s; }
+    .ranking-item:nth-child(4) { animation-delay: 1.3s; }
+    .ranking-item:nth-child(5) { animation-delay: 1.4s; }
+    .ranking-item:nth-child(6) { animation-delay: 1.5s; }
+    .ranking-item:nth-child(7) { animation-delay: 1.6s; }
+    .ranking-item:nth-child(8) { animation-delay: 1.7s; }
+    .ranking-item:nth-child(9) { animation-delay: 1.8s; }
+    .ranking-item:nth-child(10) { animation-delay: 1.9s; }
+    
+    .ranking-item:hover {
+      transform: translateX(12px) scale(1.02);
+      box-shadow: 0 4px 20px rgba(13, 59, 102, 0.2);
+      background: rgba(13, 59, 102, 0.15);
+    }
+    
+    .rank-badge {
+      min-width: 50px;
+      height: 50px;
+      border-radius: 12px;
+      background: rgba(13, 59, 102, 0.3);
+      color: #000000;
+      font-size: 24px;
+      font-weight: 900;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid rgba(13, 59, 102, 0.5);
+      transition: all 0.3s ease;
+    }
+    
+    .ranking-item:hover .rank-badge {
+      transform: rotate(360deg) scale(1.1);
+    }
+    
+    .participant-info {
+      flex: 1;
+      min-width: 0;
+    }
+    
+    .item-name {
+      font-size: 18px;
+      font-weight: 700;
+      color: #000000;
+      margin-bottom: 4px;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+    }
+    
+    .item-uni {
+      font-size: 14px;
+      color: rgba(13, 59, 102, 0.8);
+      font-weight: 600;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+    }
+    
+    .item-score {
+      font-size: 24px;
+      font-weight: 900;
+      color: #000000;
+      white-space: nowrap;
+    }
+    
+    .empty-state, .loading {
+      text-align: center;
+      padding: 80px 20px;
+      color: #0056a8;
+      font-size: 20px;
+      font-weight: 700;
+      animation: fadeIn 1s ease;
+    }
+    
+    .empty-state .icon {
+      font-size: 80px;
+      margin-bottom: 20px;
+      opacity: 0.8;
+      animation: bounce 2s infinite;
+    }
+    
+    .loading-spinner {
+      border: 6px solid rgba(13, 59, 102, 0.2);
+      border-top: 6px solid #0056a8;
+      border-radius: 50%;
+      width: 60px;
+      height: 60px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 20px;
+    }
+    
+    .brand-footer {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 1000;
+      animation: fadeIn 2s ease;
+    }
+    
+    .brand-logo {
+      height: 40px;
+      width: auto;
+      filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.2));
+      opacity: 0.9;
+      transition: opacity 0.3s ease;
+    }
+    
+    .brand-logo:hover {
+      opacity: 1;
+      animation: wiggle 0.5s ease;
+    }
+    
+    .hidden {
+      display: none !important;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    
+    @keyframes fadeInDown {
+      from {
+        opacity: 0;
+        transform: translateY(-30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    @keyframes slideInRight {
+      from {
+        opacity: 0;
+        transform: translateX(-50px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+    
+    @keyframes slideInLeft {
+      from {
+        opacity: 0;
+        transform: translateX(50px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+    
+    @keyframes growUp {
+      from {
+        opacity: 0;
+        transform: scaleY(0);
+        transform-origin: bottom;
+      }
+      to {
+        opacity: 1;
+        transform: scaleY(1);
+      }
+    }
+    
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+    
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+    
+    @keyframes float {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-10px); }
+    }
+    
+    @keyframes glow {
+      0%, 100% {
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+      }
+      50% {
+        box-shadow: 0 10px 40px rgba(255, 215, 0, 0.4);
+      }
+    }
+    
+    @keyframes shine {
+      0% { transform: translate(-50%, -50%) rotate(0deg); }
+      100% { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+    
+    @keyframes rotate {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    @keyframes countUp {
+      from { opacity: 0; transform: scale(0.5); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    
+    @keyframes wiggle {
+      0%, 100% { transform: rotate(0deg); }
+      25% { transform: rotate(-5deg); }
+      75% { transform: rotate(5deg); }
+    }
+    
+    @media (max-width: 968px) {
+      .podium {
+        gap: 15px;
+      }
+      
+      .podium-place {
+        min-width: 160px;
+        padding: 15px 10px;
+      }
+      
+      .participant-name {
+        font-size: 16px;
+        min-height: 44px;
+      }
+      
+      .participant-uni {
+        font-size: 12px;
+      }
+      
+      .rank-number {
+        font-size: 48px;
+      }
+    }
+    
+    @media (max-width: 768px) {
+      .title {
+        font-size: 32px;
+      }
+      
+      .subtitle {
+        font-size: 16px;
+      }
+      
+      .podium {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 20px;
+      }
+      
+      .podium-place {
+        width: 100%;
+        max-width: 100%;
+        min-width: unset;
+        min-height: auto !important;
+        order: 0 !important;
+        padding: 25px 20px;
+      }
+      
+      .podium-place.first {
+        animation: fadeIn 1s ease 0.3s backwards, glow 2s ease-in-out infinite;
+      }
+      
+      .podium-place.second {
+        animation: fadeIn 1s ease 0.5s backwards;
+      }
+      
+      .podium-place.third {
+        animation: fadeIn 1s ease 0.7s backwards;
+      }
+      
+      .participant-name {
+        font-size: 20px;
+        min-height: auto;
+      }
+      
+      .participant-uni {
+        font-size: 14px;
+      }
+      
+      .rank-number {
+        font-size: 64px;
+      }
+      
+      .medal {
+        font-size: 72px;
+      }
+      
+      .controls {
+        flex-direction: column;
+      }
+      
+      .quiz-select {
+        min-width: 100%;
+      }
+      
+      .ranking-list {
+        padding: 20px 15px;
+      }
+      
+      .ranking-item {
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+      
+      .item-score {
+        font-size: 20px;
+      }
+      
+      .refresh-btn {
+        bottom: 70px;
+        right: 15px;
+        width: 55px;
+        height: 55px;
+      }
+    }
+    
+    @media (max-width: 480px) {
+      body {
+        padding: 15px;
+      }
+      
+      .logo {
+        height: 60px;
+      }
+      
+      .title {
+        font-size: 28px;
+      }
+      
+      .ranking-title {
+        font-size: 24px;
+      }
+      
+      .item-name {
+        font-size: 16px;
+      }
+      
+      .item-uni {
+        font-size: 13px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="logo-section">
+        <img src="logoHootsinfondo.png" alt="Logo" class="logo" id="logoBtn" />
+      </div>
+      <h1 class="title">🏆 Top Ranking</h1>
+      <p class="subtitle">Mejores Participantes del Quiz</p>
+    </div>
+
+    <div id="selectorSection">
+      <div class="controls">
+        <select id="quizSelect" class="quiz-select">
+          <option value="">Selecciona un quiz...</option>
+        </select>
+      </div>
+
+      <div id="emptyState" class="empty-state">
+        <div class="icon">🎯</div>
+        <div>Selecciona un quiz para ver el ranking</div>
+      </div>
+
+      <div id="loadingState" class="loading" style="display: none;">
+        <div class="loading-spinner"></div>
+        <div>Cargando ranking...</div>
+      </div>
+    </div>
+
+    <div id="rankingSection" class="hidden">
+      <div id="podiumContainer" class="podium">
+        <!-- Top 3 se generará dinámicamente -->
+      </div>
+
+      <div id="rankingList" class="ranking-list" style="display: none;">
+        <h2 class="ranking-title">Resto del Ranking</h2>
+        <div id="rankingItems">
+          <!-- Resto de participantes -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <button id="refreshBtn" class="refresh-btn hidden">
+    <span class="icon">↻</span>
+  </button>
+
+  <div class="brand-footer">
+    <img src="logooIO.png" alt="Powered by" class="brand-logo" />
+  </div>
+
+  <script>
+    const API_BASE_URL = 'https://quiz-system-sfrf.onrender.com';
+
+    const quizSelect = document.getElementById('quizSelect');
+    const refreshBtn = document.getElementById('refreshBtn');
+    const logoBtn = document.getElementById('logoBtn');
+    const selectorSection = document.getElementById('selectorSection');
+    const rankingSection = document.getElementById('rankingSection');
+    const podiumContainer = document.getElementById('podiumContainer');
+    const rankingList = document.getElementById('rankingList');
+    const rankingItems = document.getElementById('rankingItems');
+    const emptyState = document.getElementById('emptyState');
+    const loadingState = document.getElementById('loadingState');
+
+    let currentQuizId = null;
+
+    async function loadQuizzes() {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/quizzes/`);
+        if (!response.ok) throw new Error('Error loading quizzes');
+        
+        const quizzes = await response.json();
+        
+        quizSelect.innerHTML = '<option value="">Selecciona un quiz...</option>' +
+          quizzes.map(quiz => 
+            `<option value="${quiz.id}">${quiz.title} - ${quiz.area}</option>`
+          ).join('');
+        
+      } catch (error) {
+        console.error('Error loading quizzes:', error);
+        alert('Error al cargar los quizzes');
+      }
+    }
+
+    async function loadRanking(quizId, forceReanimation = false) {
+      if (!quizId) {
+        showEmptyState();
+        return;
+      }
+
+      currentQuizId = quizId;
+      
+      if (forceReanimation) {
+        rankingSection.classList.add('hidden');
+        setTimeout(() => showLoading(), 100);
+      } else {
+        showLoading();
+      }
+
+      try {
+        const [quizResponse, responsesResponse] = await Promise.all([
+          fetch(`${API_BASE_URL}/api/quizzes/${quizId}`),
+          fetch(`${API_BASE_URL}/api/quizzes/${quizId}/responses`)
+        ]);
+
+        if (!quizResponse.ok || !responsesResponse.ok) {
+          throw new Error('Error loading data');
+        }
+
+        const quiz = await quizResponse.json();
+        const responses = await responsesResponse.json();
+
+        const questionsMap = new Map();
+        for (const question of quiz.questions) {
+          questionsMap.set(question.id, {
+            time_limit: question.time_limit,
+            question_type: question.question_type
+          });
+        }
+
+        const rankingsMap = new Map();
+
+        for (const response of responses) {
+          if (!response.question_id) continue;
+
+          const questionInfo = questionsMap.get(response.question_id);
+          if (!questionInfo || questionInfo.question_type === 'open_ended') continue;
+
+          const key = response.user_uni;
+
+          if (!rankingsMap.has(key)) {
+            rankingsMap.set(key, {
+              user_name: response.user_name,
+              user_uni: response.user_uni,
+              total_score: 0,
+              correct_answers: 0,
+              total_questions: 0
+            });
+          }
+
+          const ranking = rankingsMap.get(key);
+          ranking.total_questions++;
+
+          if (response.is_correct) {
+            ranking.correct_answers++;
+            const timeLimitMs = questionInfo.time_limit * 1000;
+            const timeBonus = Math.max(0, timeLimitMs - (response.response_time || 0));
+            ranking.total_score += 1000 + Math.floor(timeBonus);
+          }
+        }
+
+        const rankings = Array.from(rankingsMap.values());
+        rankings.sort((a, b) => b.total_score - a.total_score);
+
+        displayRanking(rankings);
+
+      } catch (error) {
+        console.error('Error loading ranking:', error);
+        showEmptyState();
+        alert('Error al cargar el ranking');
+      }
+    }
+
+    function displayRanking(rankings) {
+      if (rankings.length === 0) {
+        showEmptyState();
+        return;
+      }
+
+      const top3 = rankings.slice(0, 3);
+      const rest = rankings.slice(3);
+
+      podiumContainer.innerHTML = '';
+      
+      if (top3[1]) {
+        podiumContainer.appendChild(createPodiumPlace(top3[1], 2));
+      }
+      if (top3[0]) {
+        podiumContainer.appendChild(createPodiumPlace(top3[0], 1));
+      }
+      if (top3[2]) {
+        podiumContainer.appendChild(createPodiumPlace(top3[2], 3));
+      }
+
+      rankingItems.innerHTML = rest.map((participant, index) => 
+        createRankingItem(participant, index + 4)
+      ).join('');
+
+      selectorSection.classList.add('hidden');
+      rankingSection.classList.remove('hidden');
+      refreshBtn.classList.remove('hidden');
+      
+      rankingList.style.display = rest.length > 0 ? 'block' : 'none';
+    }
+
+    function createPodiumPlace(participant, rank) {
+      const div = document.createElement('div');
+      div.className = `podium-place ${rank === 1 ? 'first' : rank === 2 ? 'second' : 'third'}`;
+      
+      const medals = ['🥇', '🥈', '🥉'];
+      
+      div.innerHTML = `
+        <div class="medal">${medals[rank - 1]}</div>
+        <div class="rank-number">#${rank}</div>
+        <div class="participant-name">${escapeHtml(participant.user_name)}</div>
+        <div class="participant-uni">${escapeHtml(participant.user_uni)}</div>
+        <div class="score">${participant.total_score.toLocaleString()}</div>
+        <div class="score-label">Puntos</div>
+      `;
+      
+      return div;
+    }
+
+    function createRankingItem(participant, rank) {
+      return `
+        <div class="ranking-item">
+          <div class="rank-badge">#${rank}</div>
+          <div class="participant-info">
+            <div class="item-name">${escapeHtml(participant.user_name)}</div>
+            <div class="item-uni">${escapeHtml(participant.user_uni)}</div>
+          </div>
+          <div class="item-score">${participant.total_score.toLocaleString()}</div>
+        </div>
+      `;
+    }
+
+    function showLoading() {
+      emptyState.style.display = 'none';
+      loadingState.style.display = 'block';
+    }
+
+    function showEmptyState() {
+      loadingState.style.display = 'none';
+      emptyState.style.display = 'block';
+    }
+
+    function returnToSelector() {
+      rankingSection.classList.add('hidden');
+      selectorSection.classList.remove('hidden');
+      refreshBtn.classList.add('hidden');
+      quizSelect.value = '';
+      currentQuizId = null;
+      showEmptyState();
+    }
+
+    function escapeHtml(text) {
+      if (!text) return '';
+      return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    quizSelect.addEventListener('change', (e) => {
+      loadRanking(e.target.value);
+    });
+
+    refreshBtn.addEventListener('click', async () => {
+      if (!currentQuizId) return;
+      
+      refreshBtn.classList.add('spinning');
+      refreshBtn.disabled = true;
+      
+      await loadRanking(currentQuizId, true);
+      
+      setTimeout(() => {
+        refreshBtn.classList.remove('spinning');
+        refreshBtn.disabled = false;
+      }, 700);
+    });
+
+    logoBtn.addEventListener('click', () => {
+      returnToSelector();
+    });
+
+    loadQuizzes();
+  </script>
