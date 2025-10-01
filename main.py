@@ -808,6 +808,8 @@ def get_question(question_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail="Error al obtener pregunta")
 
 
+# BACKEND - Corrección en main.py línea ~615
+
 @app.put("/api/questions/{question_id}")
 def update_question(question_id: int, question_update: QuestionUpdate, db: Session = Depends(get_db)):
     try:
@@ -832,7 +834,7 @@ def update_question(question_id: int, question_update: QuestionUpdate, db: Sessi
         if question_update.question_order is not None:
             question.question_order = question_update.question_order
         if question_update.time_limit is not None:
-            question.question_limit = question_update.time_limit
+            question.time_limit = question_update.time_limit  # ← CORREGIDO (era question_limit)
         if question_update.question_type is not None:
             question.question_type = question_update.question_type
         if question_update.image_url is not None:
@@ -848,8 +850,7 @@ def update_question(question_id: int, question_update: QuestionUpdate, db: Sessi
                 if len(correct_answers) < 1:
                     raise HTTPException(status_code=400, detail="Debe haber al menos una respuesta correcta")
             
-            # CRÍTICO: Eliminar respuestas viejas SIN verificar user_responses
-            # porque ya verificamos arriba que no existen
+            # Eliminar respuestas viejas
             db.query(Answer).filter(Answer.question_id == question_id).delete(synchronize_session=False)
             db.flush()
             
@@ -878,6 +879,7 @@ def update_question(question_id: int, question_update: QuestionUpdate, db: Sessi
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Error al actualizar pregunta: {str(e)}")
+
 
 @app.delete("/api/questions/{question_id}")
 def delete_question(question_id: int, db: Session = Depends(get_db)):
