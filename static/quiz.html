@@ -1081,45 +1081,46 @@ function timeoutAnswer() {
       }, 1500);
     }
 
-    async function endQuiz() {
-      clearTimer();
-      questionArea.style.display = 'none';
-      results.style.display = 'block';
+// REEMPLAZAR la función endQuiz() actual por:
+async function endQuiz() {
+  clearTimer();
+  questionArea.style.display = 'none';
+  results.style.display = 'block';
 
-      try {
-        // Completar participación
-        const response = await fetch(`${API_BASE_URL}/api/participate/${participationId}/complete`, {
-          method: 'POST'
-        });
+  // FILTRAR preguntas no abiertas
+  const nonOpenQuestions = questions.filter(q => q.question_type !== 'open_ended');
 
-        if (response.ok) {
-          const result = await response.json();
-          displayResults(result);
-        } else {
-          // Mostrar resultados locales si falla la API
-          displayResults({
-            score: score,
-            total_questions: questions.length,
-            percentage: Math.round((score / questions.length) * 100)
-          });
-        }
-      } catch (error) {
-        console.error('Error completando quiz:', error);
-        displayResults({
-          score: score,
-          total_questions: questions.length,
-          percentage: Math.round((score / questions.length) * 100)
-        });
-      }
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/participate/${participationId}/complete`, {
+      method: 'POST'
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      displayResults(result, nonOpenQuestions.length);
+    } else {
+      displayResults({
+        score: score,
+        total_questions: nonOpenQuestions.length,
+        percentage: Math.round((score / nonOpenQuestions.length) * 100)
+      }, nonOpenQuestions.length);
     }
+  } catch (error) {
+    console.error('Error completando quiz:', error);
+    displayResults({
+      score: score,
+      total_questions: nonOpenQuestions.length,
+      percentage: Math.round((score / nonOpenQuestions.length) * 100)
+    }, nonOpenQuestions.length);
+  }
+}
 
 
-
-function displayResults(result) {
+// REEMPLAZAR la función displayResults() actual por:
+function displayResults(result, totalNonOpenQuestions) {
   const percentage = result.percentage;
   const totalScore = result.total_score || 0;
   
-  // Título basado en el resultado
   if (percentage >= 90) {
     scoreTitle.textContent = '¡Excelente trabajo!';
     scoreDisplay.className = 'score-display score-excellent';
@@ -1134,9 +1135,9 @@ function displayResults(result) {
     scoreDisplay.className = 'score-display score-poor';
   }
 
-  // Mostrar puntuación CON SCORE
+  // Usar totalNonOpenQuestions en lugar de result.total_questions
   scoreText.innerHTML = `
-    <div style="font-size: 48px; margin-bottom: 8px;">${result.score}/${result.total_questions}</div>
+    <div style="font-size: 48px; margin-bottom: 8px;">${result.score}/${totalNonOpenQuestions}</div>
     <div style="font-size: 20px; margin-bottom: 12px;">${percentage}% Correcto</div>
     <div style="font-size: 24px; color: #3b82f6; font-weight: 700;">
       🏆 Score: ${totalScore.toLocaleString()} puntos
@@ -1145,7 +1146,6 @@ function displayResults(result) {
 
   resultMessage.textContent = `¡Gracias por participar en "${currentQuiz.title}"!`;
 }
-
 
 
 function restartQuiz() {
