@@ -1,0 +1,1143 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <link rel="icon" type="image/png" href="talento.png" />
+  <title>Ahorro Tiene Talento - Selector de Equipos</title>
+  <style>
+    :root{
+      --bg-primary: #1a1410;
+      --bg-secondary: #2d2416;
+      --card-bg: #2a2520;
+      --text-primary: #f5e6d3;
+      --text-secondary: #d4a574;
+      --text-muted: #9ca3af;
+      --accent-gold: #d4a574;
+      --accent-gold-light: #e8c79c;
+      --accent-blue: #3b82f6;
+      --accent-green: #10b981;
+      --border: #4a3829;
+      --shadow: rgba(0, 0, 0, 0.3);
+    }
+    
+    *{box-sizing:border-box}
+    
+    html,body{
+      height:100%;
+      margin:0;
+      font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;
+      color:var(--text-primary);
+      background: var(--bg-primary);
+      overflow-x: hidden;
+    }
+    
+    .splash-screen{
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, #1a1410 0%, #2d2416 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.5s ease, visibility 0.5s ease;
+    }
+
+    .splash-screen.show{
+      opacity: 1;
+      visibility: visible;
+    }
+    
+    .splash-screen.initial{
+      opacity: 1;
+      visibility: visible;
+      animation: fadeOutInitial 1s ease 3s forwards;
+    }
+    
+    @keyframes fadeOutInitial{
+      to{
+        opacity: 0;
+        visibility: hidden;
+      }
+    }
+    
+    .splash-image{
+      max-width: 90%;
+      max-height: 90vh;
+      animation: scaleIn 2s ease;
+    }
+    
+    @keyframes scaleIn{
+      0%{
+        transform: scale(0.8);
+        opacity: 0;
+      }
+      50%{
+        transform: scale(1.05);
+        opacity: 1;
+      }
+      100%{
+        transform: scale(1);
+        opacity: 1;
+      }
+    }
+    
+    .container{
+      min-height:100vh;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+    }
+    
+    .header{
+      width: 100%;
+      max-width: 1200px;
+      text-align: center;
+      margin-bottom: 30px;
+      padding-top: 20px;
+    }
+    
+    .logo{
+      height: 120px;
+      margin-bottom: 20px;
+      cursor: pointer;
+      transition: transform 0.3s ease;
+      position: relative;
+      -webkit-mask-image: radial-gradient(ellipse 90% 85% at center, black 60%, transparent 100%);
+      mask-image: radial-gradient(ellipse 90% 85% at center, black 60%, transparent 100%);
+      filter: drop-shadow(0 4px 15px rgba(212, 165, 116, 0.4));
+    }
+
+    .logo:hover{
+      transform: scale(1.05);
+    }
+    
+    .title{
+      color: var(--accent-gold);
+      font-size: 32px;
+      font-weight: 800;
+      margin: 0 0 8px 0;
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+    }
+    
+    .subtitle{
+      color: var(--text-secondary);
+      font-size: 16px;
+      margin: 0;
+    }
+    
+    .control-panel{
+      width: 100%;
+      max-width: 1200px;
+      background: var(--card-bg);
+      border-radius: 24px;
+      padding: 30px;
+      box-shadow: 0 4px 20px var(--shadow);
+      margin-bottom: 30px;
+      border: 2px solid var(--border);
+    }
+    
+    .action-buttons{
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    
+    .btn{
+      padding: 14px 32px;
+      border: none;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    
+    .btn-primary{
+      background: linear-gradient(135deg, var(--accent-gold), var(--accent-gold-light));
+      color: #1a1410;
+      box-shadow: 0 4px 15px rgba(212, 165, 116, 0.4);
+    }
+    
+    .btn-primary:hover:not(:disabled){
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(212, 165, 116, 0.6);
+    }
+    
+    .btn-secondary{
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+      border: 2px solid var(--border);
+    }
+    
+    .btn-secondary:hover{
+      background: var(--border);
+    }
+
+    .btn-success{
+      background: linear-gradient(135deg, var(--accent-green), #059669);
+      color: white;
+      box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+    }
+
+    .btn-success:hover:not(:disabled){
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+    }
+
+    .btn:disabled{
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    .selection-display{
+      width: 100%;
+      max-width: 1200px;
+      background: var(--card-bg);
+      border-radius: 24px;
+      padding: 40px;
+      box-shadow: 0 4px 20px var(--shadow);
+      margin-bottom: 30px;
+      border: 2px solid var(--border);
+      min-height: 400px;
+      display: none;
+    }
+    
+    .selection-display.active{
+      display: block;
+    }
+    
+    .selection-title{
+      font-size: 28px;
+      font-weight: 800;
+      text-align: center;
+      margin-bottom: 30px;
+      color: var(--accent-gold);
+    }
+    
+    .animated-names-container{
+      max-width: 900px;
+      margin: 0 auto 30px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .animated-name-row{
+      font-size: 36px;
+      font-weight: 900;
+      text-align: center;
+      color: var(--accent-gold-light);
+      min-height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      letter-spacing: 2px;
+      font-family: 'Courier New', monospace;
+      text-shadow: 2px 2px 8px rgba(212, 165, 116, 0.5);
+      padding: 15px 20px;
+      background: rgba(212, 165, 116, 0.1);
+      border-radius: 12px;
+      border: 2px solid var(--border);
+    }
+
+    .name-text{
+      flex: 1;
+    }
+
+    .reload-btn{
+      background: rgba(239, 68, 68, 0.2);
+      color: #ef4444;
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      padding: 10px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 22px;
+      transition: all 0.3s ease;
+      font-weight: bold;
+      margin-left: 15px;
+      min-width: 45px;
+      flex-shrink: 0;
+    }
+
+    .reload-btn:hover{
+      background: rgba(239, 68, 68, 0.3);
+      transform: scale(1.1);
+    }
+
+    .selection-actions{
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .selected-list{
+      max-width: 900px;
+      margin: 0 auto 30px;
+      background: var(--bg-secondary);
+      border-radius: 16px;
+      padding: 24px;
+      border: 2px solid var(--border);
+    }
+
+    .selected-list h3{
+      color: var(--accent-gold);
+      font-size: 20px;
+      margin: 0 0 16px 0;
+      text-align: center;
+    }
+
+    .selected-item{
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 18px;
+      margin-bottom: 10px;
+      background: var(--card-bg);
+      border-radius: 10px;
+      border-left: 4px solid var(--accent-gold);
+    }
+
+    .selected-item-name{
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .btn-remove{
+      background: rgba(239, 68, 68, 0.2);
+      color: #ef4444;
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      padding: 8px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 20px;
+      transition: all 0.3s ease;
+      font-weight: bold;
+    }
+
+    .btn-remove:hover{
+      background: rgba(239, 68, 68, 0.3);
+      transform: scale(1.1);
+    }
+    
+    .teams-container{
+      width: 100%;
+      max-width: 1400px;
+      display: none;
+    }
+    
+    .teams-container.active{
+      display: block;
+    }
+    
+    .teams-grid{
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 24px;
+      margin-bottom: 30px;
+    }
+    
+    .team-card{
+      background: var(--card-bg);
+      border-radius: 20px;
+      padding: 28px;
+      box-shadow: 0 6px 24px var(--shadow);
+      border: 3px solid var(--border);
+      animation: slideUp 0.5s ease;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .team-card:hover{
+      transform: translateY(-4px);
+      box-shadow: 0 8px 32px rgba(212, 165, 116, 0.3);
+    }
+    
+    @keyframes slideUp{
+      from{
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to{
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    .team-header{
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 24px;
+      padding-bottom: 20px;
+      border-bottom: 3px solid var(--border);
+    }
+    
+    .team-number{
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent-gold), var(--accent-gold-light));
+      color: #1a1410;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      font-weight: 800;
+      box-shadow: 0 4px 12px rgba(212, 165, 116, 0.4);
+    }
+    
+    .team-name{
+      font-size: 24px;
+      font-weight: 800;
+      color: var(--accent-gold);
+      margin: 0;
+      text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+    }
+    
+    .team-members{
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    
+    .team-member{
+      padding: 14px 18px;
+      margin-bottom: 10px;
+      background: var(--bg-secondary);
+      border-radius: 12px;
+      font-size: 17px;
+      font-weight: 600;
+      color: var(--text-primary);
+      border-left: 5px solid var(--accent-gold);
+      animation: memberSlideIn 0.3s ease;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    @keyframes memberSlideIn{
+      from{
+        opacity: 0;
+        transform: translateX(-20px);
+      }
+      to{
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    .team-member.new{
+      background: linear-gradient(135deg, rgba(212, 165, 116, 0.3), rgba(232, 199, 156, 0.2));
+      border-left: 5px solid var(--accent-green);
+      animation: highlightNew 1s ease;
+    }
+
+    @keyframes highlightNew{
+      0%, 100%{
+        transform: translateX(0);
+      }
+      25%{
+        transform: translateX(-5px);
+      }
+      75%{
+        transform: translateX(5px);
+      }
+    }
+    
+    .error{
+      background: rgba(239, 68, 68, 0.1);
+      border: 2px solid rgba(239, 68, 68, 0.3);
+      color: #ef4444;
+      padding: 20px;
+      border-radius: 12px;
+      text-align: center;
+      font-size: 16px;
+      margin-top: 20px;
+    }
+    
+    .brand-footer{
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      opacity: 0.6;
+    }
+    
+    .brand-logo{
+      height: 28px;
+      width: auto;
+      filter: brightness(1.2);
+    }
+    
+    .stats{
+      text-align: center;
+      margin-bottom: 24px;
+      color: var(--text-secondary);
+      font-size: 16px;
+      font-weight: 700;
+      text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+    }
+
+    .progress-info{
+      text-align: center;
+      margin-bottom: 20px;
+      color: var(--text-secondary);
+      font-size: 18px;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <div class="splash-screen initial" id="splashScreen">
+    <img src="talento.png" alt="Ahorro Tiene Talento" class="splash-image" />
+  </div>
+
+  <div class="container">
+    <div class="header">
+      <img src="talento.png" alt="Logo" class="logo" onclick="toggleFullscreen()" />
+      <h1 class="title">Selector de Equipos</h1>
+      <p class="subtitle">Crea equipos aleatorios por zona</p>
+    </div>
+
+    <div class="control-panel" id="controlPanel">
+      <div class="action-buttons">
+        <button class="btn btn-primary" onclick="startSelection()">Iniciar Sorteo</button>
+      </div>
+    </div>
+
+    <div id="selectionDisplay" class="selection-display">
+      <h2 class="selection-title" id="selectionTitle">Seleccionando jugadores...</h2>
+      <div class="progress-info" id="progressInfo"></div>
+      <div id="animatedNamesContainer" class="animated-names-container"></div>
+      <div id="selectedListContainer" class="selected-list" style="display:none;">
+        <h3>Jugadores Seleccionados</h3>
+        <div id="selectedList"></div>
+      </div>
+      <div class="selection-actions">
+        <button class="btn btn-success" id="confirmBtn" onclick="confirmSelection()" style="display:none;">✓ Confirmar Equipo</button>
+      </div>
+    </div>
+
+    <div id="teamsContainer" class="teams-container">
+      <div class="stats" id="stats"></div>
+      <div class="teams-grid" id="teamsGrid"></div>
+    </div>
+
+    <div id="error" class="error" style="display:none;"></div>
+
+    <div class="brand-footer">
+      <img src="logooIO.png" alt="Powered by" class="brand-logo" />
+    </div>
+  </div>
+
+  <script>
+    // ============================================
+    // INSERTA TU ARRAY AQUÍ
+    // ============================================
+const asistentes = [
+  { firstName: "Aaron", lastName: "Cedano Amador", zona: "NORTE" },
+  { firstName: "AARON ALBERTO", lastName: "VILLALEJOS NUÑEZ", zona: "NORTE" },
+  { firstName: "Abelardo", lastName: "Estudillo Blas", zona: "NORTE" },
+  { firstName: "Abigail Amelia", lastName: "Dueñas May", zona: "PENINSULA" },
+  { firstName: "Abril Yunnuen", lastName: "Estrada Velasco", zona: "PENINSULA" },
+  { firstName: "Adrian Rogelio", lastName: "Ruiz Rodriguez", zona: "PENINSULA" },
+  { firstName: "Adriana", lastName: "Juarez Agredano", zona: "OCCIDENTE" },
+  { firstName: "Adriana", lastName: "Morales Perez", zona: "OCCIDENTE" },
+  { firstName: "Adriana", lastName: "Vargas Murillo", zona: "NORTE" },
+  { firstName: "Agustín", lastName: "Cruz Borja", zona: "NORTE" },
+  { firstName: "Agustin", lastName: "Guevara Roldan", zona: "CENTRO - SUR" },
+  { firstName: "Alain Julio", lastName: "Hernandez Brito", zona: "PENINSULA" },
+  { firstName: "ALAN GIOVANNI", lastName: "RESENDIZ RODRIGUEZ", zona: "NORTE" },
+  { firstName: "Luis Alberto", lastName: "Corona Rivera", zona: "CENTRO - SUR" },
+  { firstName: "Alberto", lastName: "Hernandez", zona: "METRO" },
+  { firstName: "Alejandra Del Carmen", lastName: "Cruz Hurtado", zona: "PENINSULA" },
+  { firstName: "Alejandra Maria", lastName: "Ortega Lopez", zona: "OCCIDENTE" },
+  { firstName: "Alejandro", lastName: "Mondragon Becerril", zona: "METRO" },
+  { firstName: "Alejandro", lastName: "Sanchez Arellano", zona: "PENINSULA" },
+  { firstName: "Alfonso Esteban", lastName: "Puga Cruz", zona: "PENINSULA" },
+  { firstName: "Alma Beatriz", lastName: "Yam Mazum", zona: "PENINSULA" },
+  { firstName: "Andrea Isabel", lastName: "Alvarez Hernandez", zona: "METRO" },
+  { firstName: "Andrea Isayana", lastName: "Sanchez Ruiz", zona: "CENTRO - SUR" },
+  { firstName: "Andres", lastName: "Martinez Cerda", zona: "CENTRO - SUR" },
+  { firstName: "Jose Andres", lastName: "Sarmiento Farrera", zona: "PENINSULA" },
+  { firstName: "Luis Angel", lastName: "Quiroz Flores", zona: "METRO" },
+  { firstName: "Antonio", lastName: "Diaz Martinez", zona: "NORTE" },
+  { firstName: "Antonio", lastName: "Vazquez Lara", zona: "METRO" },
+  { firstName: "Aracely", lastName: "Sanchez May", zona: "METRO" },
+  { firstName: "Areli", lastName: "Aguilar Muñoz", zona: "CENTRO - SUR" },
+  { firstName: "Ariadna Aide", lastName: "Amezcua Gonzalez", zona: "OCCIDENTE" },
+  { firstName: "Arturo", lastName: "Melendez Mora", zona: "CENTRO - SUR" },
+  { firstName: "Arturo", lastName: "Rico Leines", zona: "METRO" },
+  { firstName: "Audrey Montserrat", lastName: "Barcelo Cruz", zona: "CENTRO - SUR" },
+  { firstName: "BEATRIZ ELIZABETH", lastName: "GARCIA CASTILLO", zona: "NORTE" },
+  { firstName: "Blanca Yadira", lastName: "Ogazon Ortiz", zona: "NORTE" },
+  { firstName: "Blanca Flor", lastName: "Ordoñez Espinosa", zona: "METRO" },
+  { firstName: "Brisa Edith", lastName: "Mendez Cruz", zona: "CENTRO - SUR" },
+  { firstName: "Carlos", lastName: "Elenes", zona: "OCCIDENTE" },
+  { firstName: "Carlos Octavio", lastName: "Ibañez Balan", zona: "CENTRO - SUR" },
+  { firstName: "Cesar Abraham", lastName: "Bejarano Chacon", zona: "NORTE" },
+  { firstName: "Claudia Marcela", lastName: "Dominguez Moreno", zona: "NORTE" },
+  { firstName: "Maria Concepcion", lastName: "Garcia Bonilla", zona: "CENTRO - SUR" },
+  { firstName: "CYNTHIA ARACELI", lastName: "VILLA USCANGA", zona: "PENINSULA" },
+  { firstName: "Daniel Alberto", lastName: "Gomez Balcazar", zona: "PENINSULA" },
+  { firstName: "Daniel", lastName: "Montoya Vargas", zona: "NORTE" },
+  { firstName: "Daniel Arturo", lastName: "Nieto Salinas", zona: "METRO" },
+  { firstName: "Daniel", lastName: "Ventura Barriga", zona: "NORTE" },
+  { firstName: "Dany", lastName: "Gandara Galindo", zona: "CENTRO - SUR" },
+  { firstName: "Darío José", lastName: "Alvarado Carranza", zona: "PENINSULA" },
+  { firstName: "David Enrique", lastName: "Farfan Uc", zona: "PENINSULA" },
+  { firstName: "David", lastName: "Perez Torres", zona: "METRO" },
+  { firstName: "Denise", lastName: "Cortes Romero", zona: "NORTE" },
+  { firstName: "Didier Samuel", lastName: "Guillen Tovilla", zona: "METRO" },
+  { firstName: "Didier", lastName: "Lopez Piedras", zona: "METRO" },
+  { firstName: "Diego", lastName: "Velarde Perez", zona: "METRO" },
+  { firstName: "Doney Levi", lastName: "De La Cruz Ramirez", zona: "OCCIDENTE" },
+  { firstName: "Dulce María", lastName: "Antonio Martinez", zona: "CENTRO - SUR" },
+  { firstName: "Edgar Alejandro", lastName: "Avila Gonzalez", zona: "OCCIDENTE" },
+  { firstName: "EDGAR JONATHAN", lastName: "BAUTISTA VENTURA", zona: "CENTRO - SUR" },
+  { firstName: "Edgardo", lastName: "Mendoza Reyes", zona: "OCCIDENTE" },
+  { firstName: "Edgardo", lastName: "Morales Colin", zona: "NORTE" },
+  { firstName: "Edith", lastName: "Gonzalez Barrios", zona: "METRO" },
+  { firstName: "Edith", lastName: "Zopiyactle Zopiyactle", zona: "NORTE" },
+  { firstName: "Edson Misael", lastName: "Barrera Salinas", zona: "METRO" },
+  { firstName: "Eduardo Arturo", lastName: "Franco Franco", zona: "OCCIDENTE" },
+  { firstName: "Eduardo", lastName: "Melendez Torres", zona: "NORTE" },
+  { firstName: "Edy Abraham", lastName: "Bernabe Arron", zona: "NORTE" },
+  { firstName: "Efren", lastName: "Blanco Fierro", zona: "OCCIDENTE" },
+  { firstName: "Efren", lastName: "Zuñiga Carrillo", zona: "NORTE" },
+  { firstName: "Emilio Azael", lastName: "Bravo Mendoza", zona: "NORTE" },
+  { firstName: "Enrique", lastName: "Hernandez Sanchez", zona: "PENINSULA" },
+  { firstName: "Enrique", lastName: "Sanchez Morales", zona: "METRO" },
+  { firstName: "Erick Javier", lastName: "Marcial Castañeda", zona: "METRO" },
+  { firstName: "Esmeralda", lastName: "Bandala Guerrero", zona: "METRO" },
+  { firstName: "Esteban", lastName: "Puga Cruz", zona: "PENINSULA" },
+  { firstName: "Federico", lastName: "Galán Colorado", zona: "CENTRO - SUR" },
+  { firstName: "Felix Samer", lastName: "Siman Rojas", zona: "PENINSULA" },
+  { firstName: "Fernando", lastName: "Cabello Hernandez", zona: "OCCIDENTE" },
+  { firstName: "Fernando", lastName: "Ceron Morales", zona: "METRO" },
+  { firstName: "Fernando Daniel", lastName: "Grimaldo Villalobos", zona: "NORTE" },
+  { firstName: "Fernando Abraham", lastName: "Montiel Zuñiga", zona: "NORTE" },
+  { firstName: "Fernando", lastName: "Regalado Hernandez", zona: "METRO" },
+  { firstName: "Fernando", lastName: "Rosas Hernandez", zona: "METRO" },
+  { firstName: "Francisco", lastName: "Contreras Reynaga", zona: "OCCIDENTE" },
+  { firstName: "Francisco", lastName: "Lopez Martinez", zona: "CENTRO - SUR" },
+  { firstName: "Francisco", lastName: "Ponce Revilla", zona: "PENINSULA" },
+  { firstName: "Francisco Manuel", lastName: "Rocha Villegas", zona: "METRO" },
+  { firstName: "Francisco Javier", lastName: "tzompantzi sanchez", zona: "PENINSULA" },
+  { firstName: "Francisco Javier", lastName: "Vazquez Garcia", zona: "PENINSULA" },
+  { firstName: "Gabriel", lastName: "Gutierrez", zona: "METRO" },
+  { firstName: "Georgina", lastName: "Gamas De La Fuente", zona: "PENINSULA" },
+  { firstName: "Gerardo", lastName: "Rangel Rodriguez", zona: "METRO" },
+  { firstName: "Gilberth Adrian", lastName: "Morales Juarez", zona: "PENINSULA" },
+  { firstName: "Gildardo", lastName: "Verdugo Salas", zona: "OCCIDENTE" },
+  { firstName: "Giovanni Emanuel", lastName: "Hernandez Brito", zona: "CENTRO - SUR" },
+  { firstName: "GRETEL", lastName: "LOPEZ SANDOVAL", zona: "METRO" },
+  { firstName: "Griselda", lastName: "Fiallo Guzman", zona: "PENINSULA" },
+  { firstName: "Guillermo", lastName: "Bravo Mendoza", zona: "OCCIDENTE" },
+  { firstName: "Guillermo", lastName: "Gomez Lara", zona: "PENINSULA" },
+  { firstName: "Guillermo Raul", lastName: "Tamez Alanis", zona: "CENTRO - SUR" },
+  { firstName: "HECTOR ALFREDO", lastName: "PINEDA CABELLO", zona: "PENINSULA" },
+  { firstName: "HECTOR", lastName: "SANTIAGO CHAVEZ", zona: "CENTRO - SUR" },
+  { firstName: "Herminio", lastName: "Gomez Guzman", zona: "CENTRO - SUR" },
+  { firstName: "Hugo", lastName: "Cardosa Vicencio", zona: "NORTE" },
+  { firstName: "Hugo Ignacio", lastName: "Torres Lopez", zona: "NORTE" },
+  { firstName: "Humberto Jesus", lastName: "Bonola Arroniz", zona: "PENINSULA" },
+  { firstName: "Humberto", lastName: "Montiel Marquez", zona: "NORTE" },
+  { firstName: "Humberto", lastName: "Sanchez Gomez", zona: "NORTE" },
+  { firstName: "Isaac", lastName: "Gamero Morales", zona: "PENINSULA" },
+  { firstName: "Israel", lastName: "Garrido Rodriguez", zona: "CENTRO - SUR" },
+  { firstName: "Israel", lastName: "Martínez De Santiago", zona: "CENTRO - SUR" },
+  { firstName: "Ivan Eliel", lastName: "Barrios Castellanos", zona: "CENTRO - SUR" },
+  { firstName: "Ivan De Jesus", lastName: "Garcia Salazar", zona: "NORTE" },
+  { firstName: "Jacob Aaron", lastName: "Franco Camacho", zona: "PENINSULA" },
+  { firstName: "Jaime Alberto", lastName: "Herrera Escorza", zona: "NORTE" },
+  { firstName: "Jairo David", lastName: "Cordova Salazar", zona: "OCCIDENTE" },
+  { firstName: "Jennifer Nidia", lastName: "Mafra Luna", zona: "METRO" },
+  { firstName: "Jesus Roberto", lastName: "Chavez Mendoza", zona: "CENTRO - SUR" },
+  { firstName: "Jesus Mauricio", lastName: "Gonzalez Delgado", zona: "CENTRO - SUR" },
+  { firstName: "Jesus Manuel", lastName: "Marcial Apreza", zona: "NORTE" },
+  { firstName: "Jesus Adalberto", lastName: "Perez Lopez", zona: "OCCIDENTE" },
+  { firstName: "Jesus", lastName: "Tovar Flores", zona: "OCCIDENTE" },
+  { firstName: "Joana", lastName: "Maldonado Acosta", zona: "METRO" },
+  { firstName: "JORGE GUILLERMO", lastName: "ALCOCER NOVELO", zona: "PENINSULA" },
+  { firstName: "Jorge", lastName: "Meyo León", zona: "CENTRO - SUR" },
+  { firstName: "Jorge Luis", lastName: "Olvera Castillo", zona: "NORTE" },
+  { firstName: "Jorge Luis", lastName: "Quintana Reyes", zona: "PENINSULA" },
+  { firstName: "Jorge Luis", lastName: "Velazquez Sanchez", zona: "METRO" },
+  { firstName: "Jose Luis", lastName: "Bahena Garcia", zona: "CENTRO - SUR" },
+  { firstName: "Jose Quintin", lastName: "Calcaneo Velazquez", zona: "PENINSULA" },
+  { firstName: "Jose Antonio", lastName: "Cruz Ruiz", zona: "PENINSULA" },
+  { firstName: "Jose Manuel", lastName: "Lamadrid Romo", zona: "NORTE" },
+  { firstName: "Jose Francisco", lastName: "Rodriguez Otero", zona: "CENTRO - SUR" },
+  { firstName: "Jose Adrian", lastName: "Perez Suarez", zona: "METRO" },
+  { firstName: "JOSE LUIS DE JESUS", lastName: "SILVA URBINA", zona: "NORTE" },
+  { firstName: "Jose Ignacio", lastName: "Perez Zamudio", zona: "NORTE" },
+  { firstName: "Juan Carlos", lastName: "Abadia Salvador", zona: "PENINSULA" },
+  { firstName: "Juan Erik", lastName: "Baez Vazquez", zona: "NORTE" },
+  { firstName: "Juan Pablo", lastName: "Morales Murillo", zona: "PENINSULA" },
+  { firstName: "Juan Carlos", lastName: "Negrete Garcia", zona: "METRO" },
+  { firstName: "Juan Carlos", lastName: "Garcia Romero", zona: "METRO" },
+  { firstName: "Juan Jose", lastName: "Ruiz Paramo", zona: "NORTE" },
+  { firstName: "Julio Alejandro", lastName: "Avalos Villa", zona: "NORTE" },
+  { firstName: "Karina", lastName: "Martinez Araiza", zona: "NORTE" },
+  { firstName: "Karina Berenice", lastName: "Cortez Hernandez", zona: "NORTE" },
+  { firstName: "Karla Julissa", lastName: "Aguilar Piñeiro", zona: "NORTE" },
+  { firstName: "Karla Alejandra", lastName: "Gonzalez Davalos", zona: "OCCIDENTE" },
+  { firstName: "KARLA TERESA", lastName: "RAMOS VALENZUELA", zona: "OCCIDENTE" },
+  { firstName: "Karla Stephania", lastName: "Tellez Nuñez", zona: "OCCIDENTE" },
+  { firstName: "Leobardo", lastName: "Portillo Blanco", zona: "NORTE" },
+  { firstName: "Liliana Raquel", lastName: "Perez Torres", zona: "OCCIDENTE" },
+  { firstName: "Petra Liliana", lastName: "Rodriguez Najera", zona: "NORTE" },
+  { firstName: "Limbano Ernesto", lastName: "Lopez Moreno", zona: "NORTE" },
+  { firstName: "Lizbeth", lastName: "Mota Reyes", zona: "OCCIDENTE" },
+  { firstName: "Lorena", lastName: "Castañeda Amezquita", zona: "OCCIDENTE" },
+  { firstName: "Luis Maximiliano", lastName: "Alcalde Dominguez", zona: "OCCIDENTE" },
+  { firstName: "LUIS", lastName: "BASSOCO CASTILLO", zona: "PENINSULA" },
+  { firstName: "Luis Flavio", lastName: "Carrillo Cabello", zona: "NORTE" },
+  { firstName: "Luis Antonio", lastName: "Aguilar Chavez", zona: "NORTE" },
+  { firstName: "Luis Alfredo", lastName: "Trejo Zarraga", zona: "METRO" },
+  { firstName: "Manuel Alejandro", lastName: "Dorantes Esteban", zona: "CENTRO - SUR" },
+  { firstName: "Manuel Gildardo", lastName: "Gutierrez Sauceda", zona: "NORTE" },
+  { firstName: "Manuel", lastName: "Toledo Santiago", zona: "PENINSULA" },
+  { firstName: "Mara Alejandra", lastName: "Ruiz Cruz", zona: "OCCIDENTE" },
+  { firstName: "Marcela Alejandra", lastName: "Vaca Hernandez", zona: "OCCIDENTE" },
+  { firstName: "Marco Antonio", lastName: "Cantón Rodríguez", zona: "OCCIDENTE" },
+  { firstName: "Marco Gabriel", lastName: "Osornio Del Razo", zona: "NORTE" },
+  { firstName: "MARCOS", lastName: "PUEBLA GONZALEZ", zona: "OCCIDENTE" },
+  { firstName: "Maria Cristina", lastName: "Valderrama Sanchez", zona: "NORTE" },
+  { firstName: "Mario Alberto", lastName: "Calvo Mendoza", zona: "METRO" },
+  { firstName: "Mario Alberto", lastName: "De La Vega Mendoza", zona: "NORTE" },
+  { firstName: "Mario", lastName: "Garcia Loeza", zona: "OCCIDENTE" },
+  { firstName: "Mario Adalberto", lastName: "Inurreta Couret", zona: "PENINSULA" },
+  { firstName: "Mario", lastName: "Rojas Ramirez", zona: "OCCIDENTE" },
+  { firstName: "Marisol", lastName: "Hernandez Hernandez", zona: "PENINSULA" },
+  { firstName: "Laura", lastName: "Fajardo Cruz", zona: "NORTE" },
+  { firstName: "Martha Liliana", lastName: "Galindo Martinez", zona: "NORTE" },
+  { firstName: "Martin", lastName: "Matildes Suarez", zona: "OCCIDENTE" },
+  { firstName: "Martin", lastName: "Zamora Jimenez", zona: "PENINSULA" },
+  { firstName: "Mauricio Rodolfo", lastName: "Mijangos Fonseca", zona: "NORTE" },
+  { firstName: "Mauricio", lastName: "Puga Moreno", zona: "PENINSULA" },
+  { firstName: "Mauro Enrique", lastName: "Espinoza Ramos", zona: "OCCIDENTE" },
+  { firstName: "MAX ALEXANDER", lastName: "RUIZ CASTILLO", zona: "NORTE" },
+  { firstName: "Maira", lastName: "Marquez Tellez", zona: "CENTRO - SUR" },
+  { firstName: "Mayra Isabel", lastName: "Vera Rodriguez", zona: "OCCIDENTE" },
+  { firstName: "Miguel Angel", lastName: "Badillo Maximo", zona: "CENTRO - SUR" },
+  { firstName: "Miguel Angel", lastName: "Hernandez Quevedo", zona: "OCCIDENTE" },
+  { firstName: "Miguel Angel", lastName: "Vega Limon", zona: "CENTRO - SUR" },
+  { firstName: "Mirna Atzimba", lastName: "Arellano Carrillo", zona: "NORTE" },
+  { firstName: "Moises", lastName: "Hernandez Espinosa", zona: "CENTRO - SUR" },
+  { firstName: "Monica", lastName: "Bernal Ramirez", zona: "OCCIDENTE" },
+  { firstName: "Nancy Guadalupe", lastName: "Albores Gordillo", zona: "PENINSULA" },
+  { firstName: "Narciso", lastName: "Pinto Morales", zona: "PENINSULA" },
+  { firstName: "Nínive", lastName: "Cruz Ramirez", zona: "PENINSULA" },
+  { firstName: "Noé", lastName: "Méndez  Rojas", zona: "CENTRO - SUR" },
+  { firstName: "Noemi", lastName: "Ortiz Perez", zona: "METRO" },
+  { firstName: "NOHEMI", lastName: "ROSAS CRUZ", zona: "METRO" },
+  { firstName: "Norma Alejandra", lastName: "Santamaria Hoyos", zona: "CENTRO - SUR" },
+  { firstName: "Octavio", lastName: "Garcia Cabrera", zona: "METRO" },
+  { firstName: "Omar Antonio", lastName: "Cruz Gomez", zona: "PENINSULA" },
+  { firstName: "Omar", lastName: "Virrueta Chavarria", zona: "OCCIDENTE" },
+  { firstName: "Osvaldo Trinidad", lastName: "Inzunza Campos", zona: "NORTE" },
+  { firstName: "Paola Gisselle", lastName: "Sanchez Maldonado", zona: "CENTRO - SUR" },
+  { firstName: "Paulino Esteban", lastName: "Calixto Rodriguez", zona: "OCCIDENTE" },
+  { firstName: "Pedro Antonio", lastName: "Amparo Frausto", zona: "NORTE" },
+  { firstName: "Rafael Francisco", lastName: "Silva Ferruzca", zona: "CENTRO - SUR" },
+  { firstName: "Ramiro", lastName: "Gomez Corona", zona: "OCCIDENTE" },
+  { firstName: "Ramiro Ismael", lastName: "Pompa Gonzalez", zona: "NORTE" },
+  { firstName: "Ramses", lastName: "Hernandez Melgarejo", zona: "METRO" },
+  { firstName: "Ricardo", lastName: "Mojica Jimenez", zona: "METRO" },
+  { firstName: "Jose Ricardo", lastName: "Vazquez Corzo", zona: "METRO" },
+  { firstName: "Roberto Efrain", lastName: "Buenrostro Suazo", zona: "OCCIDENTE" },
+  { firstName: "Roberto", lastName: "Puente Navarro", zona: "NORTE" },
+  { firstName: "Rocío Beatriz", lastName: "Cruz Gutierrez", zona: "PENINSULA" },
+  { firstName: "Rodolfo Antonio", lastName: "Dimas Zavala", zona: "OCCIDENTE" },
+  { firstName: "Rogelio Jesús", lastName: "Aldazaba Caballero", zona: "METRO" },
+  { firstName: "Rogelio", lastName: "Hernandez Gomez", zona: "PENINSULA" },
+  { firstName: "Rogelio", lastName: "Martinez Garza", zona: "NORTE" },
+  { firstName: "Roger", lastName: "Merchan Gonzalez", zona: "OCCIDENTE" },
+  { firstName: "Rosa Alba", lastName: "Amador Carreon", zona: "METRO" },
+  { firstName: "Saira Lourdes", lastName: "Hernandez Sanchez", zona: "NORTE" },
+  { firstName: "Sandra", lastName: "Dueñas Hernandez", zona: "METRO" },
+  { firstName: "Santiago", lastName: "Romero de la Paz", zona: "CENTRO - SUR" },
+  { firstName: "Silvia", lastName: "Rivera De La Luz", zona: "CENTRO - SUR" },
+  { firstName: "Simbad", lastName: "Martinez Jonguitud", zona: "OCCIDENTE" },
+  { firstName: "Sonia Guadalupe", lastName: "Delgado Barud", zona: "OCCIDENTE" },
+  { firstName: "Ulises", lastName: "Ugarte Celaya", zona: "NORTE" },
+  { firstName: "Vicente", lastName: "Gaona Cervantes", zona: "OCCIDENTE" },
+  { firstName: "Victor Samuel", lastName: "Rodriguez Neri", zona: "METRO" },
+  { firstName: "Victoria Denisse", lastName: "Gutierrez Davila", zona: "CENTRO - SUR" },
+  { firstName: "Viridiana", lastName: "Reza Vazquez", zona: "CENTRO - SUR" },
+  { firstName: "Yadira Guadalupe", lastName: "Ruiz Santiago", zona: "CENTRO - SUR" },
+  { firstName: "Yenni Adriana", lastName: "Perez Pizaña", zona: "CENTRO - SUR" },
+  { firstName: "Yolanda", lastName: "Amador Carreon", zona: "METRO" },
+  { firstName: "Yunuen Zarahi", lastName: "Martinez Martinez", zona: "NORTE" }
+];
+ 
+    // ============================================
+
+    const ZONES = ['NORTE', 'PENINSULA', 'OCCIDENTE', 'CENTRO - SUR', 'METRO'];
+    let allParticipants = [];
+    let currentTeams = {};
+    let currentZoneIndex = 0;
+    let shuffledByZone = {};
+    let isAnimating = false;
+    let currentBatch = [];
+
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(err => {
+          console.log('Error al entrar en pantalla completa:', err);
+        });
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen();
+        }
+      }
+    }
+
+    function showSplash() {
+      const splash = document.getElementById('splashScreen');
+      splash.classList.add('show');
+      splash.classList.remove('initial');
+      
+      const img = splash.querySelector('.splash-image');
+      img.style.animation = 'none';
+      setTimeout(() => {
+        img.style.animation = 'scaleIn 1.5s ease';
+      }, 10);
+      
+      setTimeout(() => {
+        splash.classList.remove('show');
+      }, 2000);
+    }
+
+    function init() {
+      loadParticipants();
+    }
+
+    function loadParticipants() {
+      allParticipants = asistentes
+        .map(p => ({
+          firstName: p.firstName,
+          lastName: p.lastName,
+          zone: p.zone || p.zona
+        }))
+        .filter(p => p.firstName && p.lastName && p.zone);
+    }
+
+    async function startSelection() {
+      for (const zone of ZONES) {
+        const zoneParticipants = allParticipants.filter(p => p.zone === zone);
+        if (zoneParticipants.length < 5) {
+          showError(`No hay suficientes participantes en ${zone} (mínimo 5)`);
+          return;
+        }
+      }
+
+      hideError();
+      document.getElementById('controlPanel').style.display = 'none';
+      document.getElementById('selectionDisplay').classList.add('active');
+      document.getElementById('teamsContainer').classList.add('active');
+
+      currentTeams = {};
+      shuffledByZone = {};
+      ZONES.forEach(zone => {
+        currentTeams[zone] = [];
+        const zoneParticipants = allParticipants.filter(p => p.zone === zone);
+        shuffledByZone[zone] = [...zoneParticipants].sort(() => Math.random() - 0.5);
+      });
+      
+      currentZoneIndex = 0;
+
+      displayTeams();
+      selectNextZone();
+    }
+
+    async function selectNextZone() {
+      if (currentZoneIndex >= ZONES.length) {
+        finishSelection();
+        return;
+      }
+
+      const zone = ZONES[currentZoneIndex];
+      const zoneParticipants = shuffledByZone[zone];
+
+      if (zoneParticipants.length < 5) {
+        currentZoneIndex++;
+        selectNextZone();
+        return;
+      }
+
+      isAnimating = true;
+      currentBatch = [];
+      
+      document.getElementById('confirmBtn').style.display = 'none';
+      document.getElementById('selectedListContainer').style.display = 'none';
+      
+      document.getElementById('selectionTitle').textContent = `Seleccionando equipo: ${zone}`;
+      document.getElementById('progressInfo').textContent = `Zona ${currentZoneIndex + 1} de ${ZONES.length}`;
+      
+      // Tomar los primeros 5 participantes
+      const selected = zoneParticipants.slice(0, 5);
+      currentBatch = selected;
+      
+      // Crear 5 renglones con botones de recarga
+      const container = document.getElementById('animatedNamesContainer');
+      container.innerHTML = '';
+      for (let i = 0; i < 5; i++) {
+        const row = document.createElement('div');
+        row.className = 'animated-name-row';
+        row.innerHTML = `
+          <span class="name-text" id="name-row-${i}"></span>
+          <button class="reload-btn" id="reload-btn-${i}" onclick="reselectPlayer(${i})" style="visibility:hidden;">↻</button>
+        `;
+        container.appendChild(row);
+      }
+
+      // Animar los 5 simultáneamente, pero revelar uno por uno
+      await animateAllNames(selected);
+      
+      // NO mostrar la lista duplicada, los nombres ya están en los renglones animados
+      // Solo mostrar el botón de confirmar
+      document.getElementById('confirmBtn').style.display = 'inline-block';
+      isAnimating = false;
+    }
+
+    async function animateAllNames(participants) {
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+      const targetNames = participants.map(p => `${p.firstName} ${p.lastName}`);
+      const duration = 2500;
+      const steps = 50;
+      const stepDelay = duration / steps;
+      const revealDelay = 500;
+
+      for (let step = 0; step < steps; step++) {
+        for (let i = 0; i < 5; i++) {
+          const row = document.getElementById(`name-row-${i}`);
+          const targetName = targetNames[i];
+          let displayText = '';
+          
+          const revealStep = Math.floor((revealDelay * i) / stepDelay);
+          const shouldReveal = step >= revealStep;
+          
+          for (let j = 0; j < targetName.length; j++) {
+            if (targetName[j] === ' ') {
+              displayText += ' ';
+            } else {
+              if (shouldReveal) {
+                const progress = (step - revealStep) / (steps - revealStep);
+                if (Math.random() < progress) {
+                  displayText += targetName[j];
+                } else {
+                  displayText += chars[Math.floor(Math.random() * chars.length)];
+                }
+              } else {
+                displayText += chars[Math.floor(Math.random() * chars.length)];
+              }
+            }
+          }
+          row.textContent = displayText;
+        }
+        await sleep(stepDelay);
+      }
+
+      // Asegurar que todos muestren el nombre final
+      for (let i = 0; i < 5; i++) {
+        document.getElementById(`name-row-${i}`).textContent = targetNames[i];
+      }
+
+      // Mostrar botones de recarga después de la animación
+      for (let i = 0; i < 5; i++) {
+        const btn = document.getElementById(`reload-btn-${i}`);
+        if (btn) {
+          btn.style.visibility = 'visible';
+        }
+      }
+    }
+
+    async function reselectPlayer(index) {
+      if (isAnimating) return;
+      
+      isAnimating = true;
+      const zone = ZONES[currentZoneIndex];
+      
+      // Mover el jugador actual al final
+      const removed = currentBatch[index];
+      const removedIndex = shuffledByZone[zone].indexOf(removed);
+      if (removedIndex !== -1) {
+        shuffledByZone[zone].splice(removedIndex, 1);
+        shuffledByZone[zone].push(removed);
+      }
+      
+      // Obtener los jugadores ya seleccionados (excluyendo el que estamos reemplazando)
+      const alreadySelected = currentBatch.filter((p, i) => i !== index);
+      
+      // Buscar un nuevo participante que NO esté en alreadySelected
+      let newParticipant = null;
+      let attemptCount = 0;
+      const maxAttempts = shuffledByZone[zone].length;
+      
+      for (let i = 0; i < maxAttempts; i++) {
+        const candidate = shuffledByZone[zone][i];
+        const isAlreadySelected = alreadySelected.some(p => 
+          p.firstName === candidate.firstName && p.lastName === candidate.lastName
+        );
+        
+        if (!isAlreadySelected) {
+          newParticipant = candidate;
+          // Mover este participante a la posición del índice
+          shuffledByZone[zone].splice(i, 1);
+          shuffledByZone[zone].splice(index, 0, newParticipant);
+          break;
+        }
+      }
+      
+      if (!newParticipant) {
+        // Si no hay más participantes disponibles, usar el siguiente en la lista
+        newParticipant = shuffledByZone[zone][5] || shuffledByZone[zone][0];
+      }
+      
+      currentBatch[index] = newParticipant;
+      
+      const targetName = `${newParticipant.firstName} ${newParticipant.lastName}`;
+      await animateSingleName(index, targetName);
+      
+      isAnimating = false;
+    }
+
+    async function animateSingleName(rowIndex, targetName) {
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+      const row = document.getElementById(`name-row-${rowIndex}`);
+      const duration = 2000;
+      const steps = 40;
+      const stepDelay = duration / steps;
+
+      for (let step = 0; step < steps; step++) {
+        let displayText = '';
+        for (let i = 0; i < targetName.length; i++) {
+          if (targetName[i] === ' ') {
+            displayText += ' ';
+          } else {
+            const progress = step / steps;
+            if (Math.random() < progress) {
+              displayText += targetName[i];
+            } else {
+              displayText += chars[Math.floor(Math.random() * chars.length)];
+            }
+          }
+        }
+        row.textContent = displayText;
+        await sleep(stepDelay);
+      }
+
+      row.textContent = targetName;
+    }
+
+    async function confirmSelection() {
+      if (isAnimating) return;
+
+      document.getElementById('confirmBtn').style.display = 'none';
+      document.getElementById('selectedListContainer').style.display = 'none';
+
+      showSplash();
+
+      await sleep(500);
+
+      const zone = ZONES[currentZoneIndex];
+      
+      currentBatch.forEach(participant => {
+        currentTeams[zone].push(participant);
+      });
+      shuffledByZone[zone].splice(0, 5);
+      
+      displayTeams();
+      
+      await sleep(1800);
+      
+      currentZoneIndex++;
+      selectNextZone();
+    }
+
+    function displayTeams() {
+      const container = document.getElementById('teamsGrid');
+      const statsEl = document.getElementById('stats');
+      
+      const totalMembers = Object.values(currentTeams).reduce((sum, team) => sum + team.length, 0);
+      statsEl.textContent = `${ZONES.length} Equipos • ${totalMembers} Participantes Seleccionados`;
+      
+      container.innerHTML = ZONES.map(zone => {
+        const team = currentTeams[zone] || [];
+        return `
+          <div class="team-card">
+            <div class="team-header">
+              <div class="team-number">${team.length}/5</div>
+              <h3 class="team-name">${zone}</h3>
+            </div>
+            <ul class="team-members">
+              ${team.map((member) => `
+                <li class="team-member">${escapeHtml(member.firstName)} ${escapeHtml(member.lastName)}</li>
+              `).join('')}
+            </ul>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function finishSelection() {
+      document.getElementById('animatedNamesContainer').innerHTML = '';
+      document.getElementById('selectedListContainer').style.display = 'none';
+      document.getElementById('selectionTitle').textContent = '¡Sorteo Completado!';
+      document.getElementById('progressInfo').innerHTML = '<div style="font-size: 24px; color: var(--accent-green); text-align: center; margin: 30px 0;">Todos los equipos han sido formados</div>';
+      
+      document.getElementById('confirmBtn').style.display = 'none';
+      
+      const actionsDiv = document.querySelector('.selection-actions');
+      actionsDiv.innerHTML = '<button class="btn btn-primary" onclick="resetAll()">Nuevo Sorteo</button>';
+    }
+
+    function resetAll() {
+      currentTeams = {};
+      shuffledByZone = {};
+      currentZoneIndex = 0;
+      currentBatch = [];
+      
+      document.getElementById('teamsContainer').classList.remove('active');
+      document.getElementById('selectionDisplay').classList.remove('active');
+      document.getElementById('controlPanel').style.display = 'block';
+      
+      hideError();
+    }
+
+    function showError(message) {
+      document.getElementById('error').textContent = message;
+      document.getElementById('error').style.display = 'block';
+      setTimeout(hideError, 5000);
+    }
+
+    function hideError() {
+      document.getElementById('error').style.display = 'none';
+    }
+
+    function escapeHtml(text) {
+      if (!text) return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function sleep(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    window.addEventListener('load', init);
+  </script>
+</body>
+</html>
+
