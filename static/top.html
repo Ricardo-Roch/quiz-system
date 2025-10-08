@@ -17,11 +17,14 @@
       min-height: 100vh;
       padding: 20px;
       color: #0056a8;
+      overflow-y: auto;
+      overflow-x: hidden;
     }
     
     .container {
       max-width: 1200px;
       margin: 0 auto;
+      overflow-x: hidden;
     }
     
     .header {
@@ -295,18 +298,9 @@
       grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
       gap: 12px;
       width: 100%;
-      padding: 20px;
+      padding: 0;
       max-height: 80vh;
       overflow-y: auto;
-      overflow-x: hidden;
-    }
-    
-    body {
-      overflow-y: auto;
-      overflow-x: hidden;
-    }
-    
-    .container {
       overflow-x: hidden;
     }
     
@@ -880,8 +874,9 @@
       } while (winnersSet.has(winnerName));
       
       let highlightCount = 0;
-      const maxHighlights = 25 + Math.floor(Math.random() * 10);
-      const constantSpeed = 500;
+      const totalDuration = 9000; // 9 segundos totales
+      const maxHighlights = 18; // número de cambios durante el sorteo
+      const highlightSpeed = totalDuration / maxHighlights;
       
       function highlightRandom() {
         boxes.forEach(box => {
@@ -901,14 +896,14 @@
         
         boxes[randomIndex].classList.add('highlighted');
         boxes[randomIndex].scrollIntoView({ 
-          behavior: 'smooth', 
+          behavior: 'auto', 
           block: 'center'
         });
         
         highlightCount++;
         
         if (highlightCount <= maxHighlights) {
-          setTimeout(highlightRandom, constantSpeed);
+          setTimeout(highlightRandom, highlightSpeed);
         } else {
           boxes.forEach(box => {
             if (!box.classList.contains('disqualified')) {
@@ -916,12 +911,15 @@
             }
           });
           boxes[winnerIndex].classList.add('winner');
-          boxes[winnerIndex].scrollIntoView({ 
-            behavior: 'smooth', 
-            block: 'center'
-          });
           
           winnersSet.add(winnerName);
+          
+          // Scroll inmediato al ganador
+          boxes[winnerIndex].scrollIntoView({ 
+            behavior: 'auto', 
+            block: 'center',
+            inline: 'center'
+          });
           
           setTimeout(() => {
             showWinner(winnerName);
