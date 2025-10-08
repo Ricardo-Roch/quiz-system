@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ruletas de Sorteo</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background: radial-gradient(circle, #5a5ae0, #1b1b38);
+      color: white;
+      font-family: 'Arial', sans-serif;
+      padding: 20px;
+    }
+
+    .titulo {
+      font-size: 32px;
+      font-weight: bold;
+      margin-bottom: 20px;
+      text-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+    }
+
+    .selector-ruletas {
+      display: flex;
+      gap: 15px;
+      margin-bottom: 30px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .btn-selector {
+      padding: 12px 30px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      border: 3px solid #FFD700;
+      background: transparent;
+      color: white;
+      border-radius: 25px;
+      transition: all 0.3s ease;
+    }
+
+    .btn-selector:hover {
+      background: rgba(255, 215, 0, 0.2);
+      transform: scale(1.05);
+    }
+
+    .btn-selector.active {
+      background: linear-gradient(135deg, #FFD700, #FFA500);
+      color: #000;
+      box-shadow: 0 6px 20px rgba(255, 215, 0, 0.4);
+    }
+
+    .container {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    #flecha {
+      width: 0;
+      height: 0;
+      border-left: 20px solid transparent;
+      border-right: 20px solid transparent;
+      border-top: 40px solid #FFD700;
+      margin-bottom: -10px;
+      z-index: 10;
+      filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.5));
+    }
+
+    .ruleta-wrapper {
+      position: relative;
+      margin: 20px 0;
+    }
+
+    canvas {
+      border: 12px solid #fff;
+      border-radius: 50%;
+      background-color: #222;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+      display: block;
+      width: 1100px;
+      height: 1100px;
+    }
+
+    .centro-circulo {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 140px;
+      height: 140px;
+      background: linear-gradient(135deg, #ffffff, #e0e0e0);
+      border-radius: 50%;
+      border: 6px solid #FFD700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      font-weight: bold;
+      color: #333;
+      text-align: center;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+      pointer-events: none;
+      z-index: 5;
+      padding: 10px;
+      line-height: 1.2;
+    }
+
+    button.btn-girar {
+      margin-top: 20px;
+      padding: 15px 40px;
+      font-size: 20px;
+      font-weight: bold;
+      cursor: pointer;
+      border: none;
+      background: linear-gradient(135deg, #FFD700, #FFA500);
+      color: #000;
+      border-radius: 50px;
+      box-shadow: 0 6px 20px rgba(255, 215, 0, 0.4);
+      transition: all 0.3s ease;
+    }
+
+    button.btn-girar:hover {
+      transform: scale(1.05);
+      box-shadow: 0 8px 30px rgba(255, 215, 0, 0.6);
+    }
+
+    button.btn-girar:active {
+      transform: scale(0.98);
+    }
+
+    button.btn-girar:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: scale(1);
+    }
+
+    .resultado-container {
+      margin-top: 30px;
+      padding: 20px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 15px;
+      backdrop-filter: blur(10px);
+      min-height: 150px;
+      max-width: 500px;
+      text-align: center;
+    }
+
+    #resultado {
+      font-size: 28px;
+      font-weight: bold;
+      text-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+      margin-bottom: 15px;
+    }
+
+    .detalles {
+      font-size: 18px;
+      line-height: 1.6;
+      margin-top: 10px;
+    }
+
+    .detalles div {
+      margin: 5px 0;
+    }
+
+    .detalles strong {
+      color: #FFD700;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+
+    .ganador {
+      animation: pulse 1s ease infinite;
+    }
+
+    @media (max-width: 600px) {
+      canvas {
+        width: 320px !important;
+        height: 320px !important;
+      }
+
+      .centro-circulo {
+        width: 100px;
+        height: 100px;
+        font-size: 12px;
+      }
+
+      #resultado {
+        font-size: 22px;
+      }
+
+      button.btn-girar {
+        font-size: 18px;
+        padding: 12px 30px;
+      }
+
+      .btn-selector {
+        font-size: 14px;
+        padding: 10px 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <h1 class="titulo">🎯 Sorteo de Personal</h1>
+
+  <div class="selector-ruletas">
+    <button class="btn-selector active" onclick="cambiarRuleta(0)">Directores de Negocio</button>
+    <button class="btn-selector" onclick="cambiarRuleta(1)">ROC, GteOpe, GteMKT, GteRH</button>
+    <button class="btn-selector" onclick="cambiarRuleta(2)">Corpo</button>
+  </div>
+
+  <div class="container">
+    <div id="flecha"></div>
+    <div class="ruleta-wrapper">
+      <canvas id="ruleta" width="550" height="550"></canvas>
+      <div class="centro-circulo" id="centroTexto">LEE EL<br>NOMBRE</div>
+    </div>
+    <button class="btn-girar" onclick="girar()" id="btnGirar">🎯 Girar Ruleta</button>
+    
+    <div class="resultado-container">
+      <div id="resultado"></div>
+      <div class="detalles" id="detalles"></div>
+    </div>
+  </div>
+
+  <script>
+    // DATOS DE EJEMPLO - AQUÍ PUEDES PONER TUS DATOS REALES
+    
+    // Ruleta 1: Directores de Negocio
+    const directores = [
+      {nombre: "Juan Pérez", region: "Norte", plaza: "Monterrey", puesto: "Director Regional"},
+      {nombre: "María López", region: "Sur", plaza: "Guadalajara", puesto: "Director Regional"},
+      {nombre: "Carlos Ramírez", region: "Centro", plaza: "Ciudad de México", puesto: "Director Regional"},
+      {nombre: "Ana García", region: "Occidente", plaza: "León", puesto: "Director Regional"},
+      {nombre: "Roberto Sánchez", region: "Bajío", plaza: "Querétaro", puesto: "Director Regional"},
+      {nombre: "Laura Martínez", region: "Sureste", plaza: "Cancún", puesto: "Director Regional"},
+      {nombre: "Pedro Torres", region: "Pacífico", plaza: "Culiacán", puesto: "Director Regional"},
+      {nombre: "Sofia Hernández", region: "Golfo", plaza: "Veracruz", puesto: "Director Regional"}
+    ];
+
+    // Ruleta 2: ROC, GteOpe, GteMKT, GteRH
+    const gerentes = [
+      {nombre: "VIRIDIANA REZA VAZQUEZ", zona: "Centro - Sur", plaza: "CUERNAVACA", puesto: "Gerente Operativo"},
+      {nombre: "FRANCISCO LOPEZ MARTINEZ", zona: "Centro - Sur", plaza: "CUERNAVACA", puesto: "ROC"},
+      {nombre: "MANUEL ALEJANDRO DORANTES ESTEBAN", zona: "Centro - Sur", plaza: "CUERNAVACA", puesto: "ROC"},
+      {nombre: "ISRAEL GARRIDO RODRIGUEZ", zona: "Centro - Sur", plaza: "CUERNAVACA", puesto: "ROC"},
+      {nombre: "ANDREA ISAYANA SANCHEZ RUIZ", zona: "Centro - Sur", plaza: "CUERNAVACA", puesto: "ROC"},
+      {nombre: "YENNI ADRIANA PEREZ PIZAÑA", zona: "Centro - Sur", plaza: "CUERNAVACA", puesto: "ROC"},
+      {nombre: "DULCE MARIA ANTONIO MARTINEZ", zona: "Centro - Sur", plaza: "OAXACA", puesto: "Gerente Operativo"},
+      {nombre: "IVAN ELIEL BARRIOS CASTELLANOS", zona: "Centro - Sur", plaza: "OAXACA", puesto: "ROC"},
+      {nombre: "HERMINIO GOMEZ GUZMAN", zona: "Centro - Sur", plaza: "OAXACA", puesto: "ROC"},
+      {nombre: "CARLOS OCTAVIO IBAÑEZ BALAN", zona: "Centro - Sur", plaza: "OAXACA", puesto: "ROC"},
+      {nombre: "HECTOR SANTIAGO CHAVEZ", zona: "Centro - Sur", plaza: "OAXACA", puesto: "ROC"},
+      {nombre: "EDGAR JONATHAN BAUTISTA VENTURA", zona: "Centro - Sur", plaza: "OAXACA", puesto: "ROC"},
+      {nombre: "BRISA EDITH MENDEZ CRUZ", zona: "Centro - Sur", plaza: "OAXACA", puesto: "ROC"},
+      {nombre: "MOISES HERNANDEZ ESPINOSA", zona: "Centro - Sur", plaza: "PUEBLA", puesto: "Gerente Operativo"},
+      {nombre: "JOSE FRANCISCO RODRIGUEZ OTERO", zona: "Centro - Sur", plaza: "PUEBLA", puesto: "ROC"},
+      {nombre: "JORGE MEYO LEON", zona: "Centro - Sur", plaza: "PUEBLA", puesto: "ROC"},
+      {nombre: "ARTURO MELENDEZ MORA", zona: "Centro - Sur", plaza: "PUEBLA", puesto: "ROC"},
+      {nombre: "MARIA CONCEPCION GARCIA BONILLA", zona: "Centro - Sur", plaza: "PUEBLA", puesto: "ROC"},
+      {nombre: "AUDREY MONTSERRAT BARCELO CRUZ", zona: "Centro - Sur", plaza: "PUEBLA", puesto: "ROC"},
+      {nombre: "JOSE LUIS BAHENA GARCIA", zona: "Norte", plaza: "PUEBLA FORANEAS", puesto: "ROC"},
+      {nombre: "MIGUEL ANGEL BADILLO MAXIMO", zona: "Centro - Sur", plaza: "PUEBLA FORANEAS", puesto: "ROC"},
+      {nombre: "YADIRA GUADALUPE RUIZ SANTIAGO", zona: "Centro - Sur", plaza: "PUEBLA FORANEAS", puesto: "ROC"},
+      {nombre: "ARELI AGUILAR MUÑOZ", zona: "Centro - Sur", plaza: "PUEBLA FORANEAS", puesto: "ROC"},
+      {nombre: "PAOLA GISSELLE SANCHEZ MALDONADO", zona: "Centro - Sur", plaza: "PUEBLA FORANEAS", puesto: "ROC"},
+      {nombre: "LUIS ALBERTO CORONA RIVERA", zona: "Centro - Sur", plaza: "QUERETARO", puesto: "ROC"},
+      {nombre: "RAFAEL FRANCISCO SILVA FERRUZCA", zona: "Centro - Sur", plaza: "QUERETARO", puesto: "ROC"},
+      {nombre: "ISRAEL MARTINEZ DE SANTIAGO", zona: "Centro - Sur", plaza: "QUERETARO", puesto: "ROC"},
+      {nombre: "JESUS ROBERTO CHAVEZ MENDOZA", zona: "Centro - Sur", plaza: "QUERETARO", puesto: "ROC"},
+      {nombre: "NORMA ALEJANDRA SANTAMARIA HOYOS", zona: "Centro - Sur", plaza: "QUERETARO", puesto: "ROC"},
+      {nombre: "VICTORIA DENISSE GUTIERREZ DAVILA", zona: "Centro - Sur", plaza: "QUERETARO", puesto: "ROC"},
+      {nombre: "SOFHIA PEREZ LOPEZ", zona: "Centro - Sur", plaza: "STAFF CORPO", puesto: "Gerente Regional MKT"},
+      {nombre: "FEDERICO GALAN COLORADO", zona: "Centro - Sur", plaza: "VERACRUZ NORTE", puesto: "Gerente Operativo"},
+      {nombre: "AGUSTIN GUEVARA ROLDAN", zona: "Centro - Sur", plaza: "VERACRUZ NORTE", puesto: "ROC"},
+      {nombre: "MIGUEL ANGEL VEGA LIMON", zona: "Centro - Sur", plaza: "VERACRUZ NORTE", puesto: "ROC"},
+      {nombre: "DANY GANDARA GALINDO", zona: "Centro - Sur", plaza: "VERACRUZ NORTE", puesto: "ROC"},
+      {nombre: "MAIRA MARQUEZ TELLEZ", zona: "Centro - Sur", plaza: "VERACRUZ NORTE", puesto: "ROC"},
+      {nombre: "SILVIA RIVERA DE LA LUZ", zona: "Centro - Sur", plaza: "VERACRUZ NORTE", puesto: "ROC"},
+      {nombre: "ROSALIA CABALLERO OLVERA", zona: "Corporativo", plaza: "CORPORATIVO", puesto: "Gerente sr RRHH"},
+      {nombre: "SARA SOTO MARQUEZ", zona: "Corporativo", plaza: "CORPORATIVO", puesto: "Gerente sr RRHH"},
+      {nombre: "JUAN MANUEL ESTRADA PEREZ", zona: "Corporativo", plaza: "CORPORATIVO", puesto: "Gerente sr RRHH"},
+      {nombre: "DIDIER LOPEZ PIEDRAS", zona: "Metro", plaza: "METRO", puesto: "Gerente Operativo"},
+      {nombre: "JORGE ALBERTO CASTILLO MEZA", zona: "Metro", plaza: "Metro", puesto: "Gerente Regional MKT"},
+      {nombre: "LUIS ALFREDO TREJO ZARRAGA", zona: "Metro", plaza: "MEXICO CENTRO", puesto: "ROC"},
+      {nombre: "ALBERTO HERNANDEZ", zona: "Metro", plaza: "MEXICO CENTRO", puesto: "ROC"},
+      {nombre: "RAMSES HERNANDEZ MELGAREJO", zona: "Metro", plaza: "MEXICO CENTRO", puesto: "ROC"},
+      {nombre: "JOSE ADRIAN PEREZ SUAREZ", zona: "Metro", plaza: "MEXICO CENTRO", puesto: "ROC"},
+      {nombre: "FRANCISCO MANUEL ROCHA VILLEGAS", zona: "Metro", plaza: "MEXICO CENTRO", puesto: "ROC"},
+      {nombre: "YOLANDA AMADOR CARREON", zona: "Metro", plaza: "MEXICO CENTRO", puesto: "ROC"},
+      {nombre: "ARACELY SANCHEZ MAY", zona: "Metro", plaza: "MEXICO CENTRO", puesto: "ROC"},
+      {nombre: "JORGE LUIS VELAZQUEZ SANCHEZ", zona: "Metro", plaza: "MEXICO NORTE", puesto: "ROC"},
+      {nombre: "LUIS ANGEL QUIROZ FLORES", zona: "Metro", plaza: "MEXICO NORTE", puesto: "ROC"},
+      {nombre: "SANDRA DUEÑAS HERNANDEZ", zona: "Metro", plaza: "MEXICO NORTE", puesto: "ROC"},
+      {nombre: "JOANA MALDONADO ACOSTA", zona: "Metro", plaza: "MEXICO NORTE", puesto: "ROC"},
+      {nombre: "MARIO ALBERTO CALVO MENDOZA", zona: "Metro", plaza: "MEXICO ORIENTE", puesto: "ROC"},
+      {nombre: "ANTONIO VAZQUEZ LARA", zona: "Metro", plaza: "MEXICO ORIENTE", puesto: "ROC"},
+      {nombre: "DAVID PEREZ TORRES", zona: "Metro", plaza: "MEXICO ORIENTE", puesto: "ROC"},
+      {nombre: "GERARDO RANGEL RODRIGUEZ", zona: "Metro", plaza: "MEXICO ORIENTE", puesto: "ROC"},
+      {nombre: "EDITH GONZALEZ BARRIOS", zona: "Metro", plaza: "MEXICO ORIENTE", puesto: "ROC"},
+      {nombre: "NOEMI ORTIZ PEREZ", zona: "Metro", plaza: "MEXICO ORIENTE", puesto: "ROC"},
+      {nombre: "ANDREA ISABEL ALVAREZ HERNANDEZ", zona: "Metro", plaza: "MEXICO ORIENTE", puesto: "ROC"},
+      {nombre: "JUAN CARLOS NEGRETE GARCIA", zona: "Metro", plaza: "MEXICO SUR", puesto: "ROC"},
+      {nombre: "FERNANDO ROSAS HERNANDEZ", zona: "Metro", plaza: "MEXICO SUR", puesto: "ROC"},
+      {nombre: "ENRIQUE SANCHEZ MORALES", zona: "Metro", plaza: "MEXICO SUR", puesto: "ROC"},
+      {nombre: "DANIEL ARTURO NIETO SALINAS", zona: "Metro", plaza: "MEXICO SUR", puesto: "ROC"},
+      {nombre: "ROSA ALBA AMADOR CARREON", zona: "Metro", plaza: "MEXICO SUR", puesto: "ROC"},
+      {nombre: "ESMERALDA BANDALA GUERRERO", zona: "Metro", plaza: "MEXICO SUR", puesto: "ROC"},
+      {nombre: "GRETEL LOPEZ SANDOVAL", zona: "Metro", plaza: "MEXICO SUR", puesto: "ROC"},
+      {nombre: "VICTOR SAMUEL RODRIGUEZ NERI", zona: "Metro", plaza: "PACHUCA", puesto: "ROC"},
+      {nombre: "EDSON MISAEL BARRERA SALINAS", zona: "Metro", plaza: "PACHUCA", puesto: "ROC"},
+      {nombre: "ARTURO RICO LEINES", zona: "Metro", plaza: "PACHUCA", puesto: "ROC"},
+      {nombre: "FERNANDO CERON MORALES", zona: "Metro", plaza: "PACHUCA", puesto: "ROC"},
+      {nombre: "JUAN CARLOS GARCIA ROMERO", zona: "Metro", plaza: "PACHUCA", puesto: "ROC"},
+      {nombre: "DIEGO VELARDE PEREZ", zona: "Metro", plaza: "TOLUCA", puesto: "ROC"},
+      {nombre: "ERICK JAVIER MARCIAL CASTAÑEDA", zona: "Metro", plaza: "TOLUCA", puesto: "ROC"},
+      {nombre: "BLANCA FLOR ORDOÑEZ ESPINOSA", zona: "Metro", plaza: "TOLUCA", puesto: "ROC"},
+      {nombre: "NOHEMI ROSAS CRUZ", zona: "Metro", plaza: "TOLUCA", puesto: "ROC"},
+      {nombre: "RICARDO MOJICA JIMENEZ", zona: "Metro", plaza: "TOLUCA FORANEAS", puesto: "ROC"},
+      {nombre: "ALEJANDRO MONDRAGON BECERRIL", zona: "Metro", plaza: "TOLUCA FORANEAS", puesto: "ROC"},
+      {nombre: "JENNIFER NIDIA MAFRA LUNA", zona: "Metro", plaza: "TOLUCA FORANEAS", puesto: "ROC"},
+      {nombre: "LUIS ANTONIO AGUILAR CHAVEZ", zona: "Norte", plaza: "AGUASCALIENTES", puesto: "ROC"},
+      {nombre: "MARIA CRISTINA VALDERRAMA SANCHEZ", zona: "Norte", plaza: "AGUASCALIENTES", puesto: "ROC"},
+      {nombre: "EDGARDO MORALES COLIN", zona: "Norte", plaza: "BAJA CALIFORNIA NORTE", puesto: "ROC"},
+      {nombre: "ULISES UGARTE CELAYA", zona: "Norte", plaza: "BAJA CALIFORNIA NORTE", puesto: "ROC"},
+      {nombre: "PEDRO ANTONIO AMPARO FRAUSTO", zona: "Norte", plaza: "BAJA CALIFORNIA NORTE", puesto: "ROC"},
+      {nombre: "JOSE IGNACIO PEREZ ZAMUDIO", zona: "Norte", plaza: "BAJA CALIFORNIA NORTE", puesto: "ROC"},
+      {nombre: "OSVALDO TRINIDAD INZUNZA CAMPOS", zona: "Norte", plaza: "BAJA CALIFORNIA NORTE", puesto: "ROC"},
+      {nombre: "HUMBERTO MONTIEL MARQUEZ", zona: "Norte", plaza: "CHIHUAHUA", puesto: "ROC"},
+      {nombre: "CESAR ABRAHAM BEJARANO CHACON", zona: "Norte", plaza: "CHIHUAHUA", puesto: "ROC"},
+      {nombre: "AARON ALBERTO VILLALEJOS NUÑEZ", zona: "Norte", plaza: "CHIHUAHUA", puesto: "ROC"},
+      {nombre: "LEOBARDO PORTILLO BLANCO", zona: "Norte", plaza: "CHIHUAHUA", puesto: "ROC"},
+      {nombre: "MANUEL GILDARDO GUTIERREZ SAUCEDA", zona: "Norte", plaza: "CHIHUAHUA", puesto: "ROC"},
+      {nombre: "DENISE CORTES ROMERO", zona: "Norte", plaza: "CHIHUAHUA", puesto: "ROC"},
+      {nombre: "JORGE LUIS OLVERA CASTILLO", zona: "Norte", plaza: "COAHUILA", puesto: "ROC"},
+      {nombre: "AGUSTIN CRUZ BORJA", zona: "Norte", plaza: "COAHUILA", puesto: "ROC"},
+      {nombre: "BLANCA YADIRA OGAZON ORTIZ", zona: "Norte", plaza: "COAHUILA", puesto: "ROC"},
+      {nombre: "DANIEL VENTURA BARRIGA", zona: "Norte", plaza: "HERMOSILLO", puesto: "ROC"},
+      {nombre: "HUGO IGNACIO TORRES LOPEZ", zona: "Norte", plaza: "HERMOSILLO", puesto: "ROC"},
+      {nombre: "JESUS MANUEL MARCIAL APREZA", zona: "Norte", plaza: "HERMOSILLO", puesto: "ROC"},
+      {nombre: "EFREN ZUÑIGA CARRILLO", zona: "Norte", plaza: "HERMOSILLO", puesto: "ROC"},
+      {nombre: "KARINA BERENICE CORTEZ HERNANDEZ", zona: "Norte", plaza: "HERMOSILLO", puesto: "ROC"},
+      {nombre: "IVAN DE JESUS GARCIA SALAZAR", zona: "Norte", plaza: "MATAMOROS", puesto: "ROC"},
+      {nombre: "HUGO CARDOSA VICENCIO", zona: "Norte", plaza: "MATAMOROS", puesto: "ROC"},
+      {nombre: "JULIO ALEJANDRO AVALOS VILLA", zona: "Norte", plaza: "MONTERREY ORIENTE", puesto: "Gerente Operativo"},
+      {nombre: "MARTHA LILIANA GALINDO MARTINEZ", zona: "Norte", plaza: "MONTERREY ORIENTE", puesto: "ROC"},
+      {nombre: "HUMBERTO SANCHEZ GOMEZ", zona: "Norte", plaza: "MONTERREY ORIENTE", puesto: "ROC"},
+      {nombre: "FERNANDO DANIEL GRIMALDO VILLALOBOS", zona: "Norte", plaza: "MONTERREY ORIENTE", puesto: "ROC"},
+      {nombre: "MARTHA LAURA FAJARDO CRUZ", zona: "Norte", plaza: "MONTERREY ORIENTE", puesto: "ROC"},
+      {nombre: "ALAN GIOVANNI RESENDIZ RODRIGUEZ", zona: "Norte", plaza: "MONTERREY ORIENTE", puesto: "ROC"},
+      {nombre: "EDY ABRAHAM BERNABE ARRON", zona: "Norte", plaza: "MONTERREY ORIENTE", puesto: "ROC"},
+      {nombre: "BEATRIZ ELIZABETH GARCIA CASTILLO", zona: "Norte", plaza: "MONTERREY ORIENTE", puesto: "ROC"},
+      {nombre: "MARIO ALBERTO DE LA VEGA MENDOZA", zona: "Norte", plaza: "MONTERREY PONIENTE", puesto: "Gerente Operativo"},
+      {nombre: "SAIRA LOURDES HERNANDEZ SANCHEZ", zona: "Norte", plaza: "MONTERREY PONIENTE", puesto: "ROC"},
+      {nombre: "EDITH ZOPIYACTLE ZOPIYACTLE", zona: "Norte", plaza: "MONTERREY PONIENTE", puesto: "ROC"},
+      {nombre: "MAURICIO RODOLFO MIJANGOS FONSECA", zona: "Norte", plaza: "MONTERREY PONIENTE", puesto: "ROC"},
+      {nombre: "EMILIO AZAEL BRAVO MENDOZA", zona: "Norte", plaza: "MONTERREY PONIENTE", puesto: "ROC"},
+      {nombre: "ROBERTO PUENTE NAVARRO", zona: "Norte", plaza: "MONTERREY PONIENTE", puesto: "ROC"},
+      {nombre: "JOSE LUIS DE JESUS SILVA URBINA", zona: "Norte", plaza: "MONTERREY PONIENTE", puesto: "ROC"},
+      {nombre: "MARCO GABRIEL OSORNIO DEL RAZO", zona: "Norte", plaza: "NUEVO LAREDO", puesto: "ROC"},
+      {nombre: "DANIEL MONTOYA VARGAS", zona: "Norte", plaza: "NUEVO LAREDO", puesto: "ROC"},
+      {nombre: "LUIS FLAVIO CARRILLO CABELLO", zona: "Norte", plaza: "REYNOSA", puesto: "ROC"},
+      {nombre: "ADRIANA VARGAS MURILLO", zona: "Norte", plaza: "REYNOSA", puesto: "ROC"},
+      {nombre: "EDUARDO MELENDEZ TORRES", zona: "Norte", plaza: "SAN LUIS POTOSI", puesto: "ROC"},
+      {nombre: "ABELARDO ESTUDILLO BLAS", zona: "Norte", plaza: "SAN LUIS POTOSI", puesto: "ROC"},
+      {nombre: "YUNUEN ZARAHI MARTINEZ MARTINEZ", zona: "Norte", plaza: "SAN LUIS POTOSI", puesto: "ROC"},
+      {nombre: "CLAUDIA MARCELA DOMINGUEZ MORENO", zona: "Norte", plaza: "SAN LUIS POTOSI", puesto: "ROC"},
+      {nombre: "KARINA MARTINEZ ARAIZA", zona: "Norte", plaza: "SAN LUIS POTOSI", puesto: "ROC"},
+      {nombre: "VIRGINIO EDUARDO BARRAZA GRANADOS", zona: "Norte", plaza: "STAFF CORPO", puesto: "Gerente Regional MKT"},
+      {nombre: "JUAN ERIK BAEZ VAZQUEZ", zona: "Norte", plaza: "TAMPICO", puesto: "ROC"},
+      {nombre: "MAX ALEXANDER RUIZ CASTILLO", zona: "Norte", plaza: "TAMPICO", puesto: "ROC"},
+      {nombre: "KARLA JULISSA AGUILAR PIÑEIRO", zona: "Norte", plaza: "TAMPICO", puesto: "ROC"},
+      {nombre: "FERNANDO CABELLO HERNANDEZ", zona: "Occidente", plaza: "ACAPULCO", puesto: "ROC"},
+      {nombre: "MARIO ROJAS RAMIREZ", zona: "Occidente", plaza: "ACAPULCO", puesto: "ROC"},
+      {nombre: "EFREN BLANCO FIERRO", zona: "Occidente", plaza: "ACAPULCO", puesto: "ROC"},
+      {nombre: "ROBERTO EFRAIN BUENROSTRO SUAZO", zona: "Occidente", plaza: "ACAPULCO", puesto: "ROC"},
+      {nombre: "MAYRA ISABEL VERA RODRIGUEZ", zona: "Occidente", plaza: "ACAPULCO", puesto: "ROC"},
+      {nombre: "RODOLFO ANTONIO DIMAS ZAVALA", zona: "Occidente", plaza: "BAJA CALIFORNIA SUR", puesto: "ROC"},
+      {nombre: "MIGUEL ANGEL HERNANDEZ QUEVEDO", zona: "Occidente", plaza: "BAJA CALIFORNIA SUR", puesto: "ROC"},
+      {nombre: "MARTIN MATILDES SUAREZ", zona: "Occidente", plaza: "CELAYA", puesto: "ROC"},
+      {nombre: "ALEJANDRA MARIA ORTEGA LOPEZ", zona: "Occidente", plaza: "CELAYA", puesto: "ROC"},
+      {nombre: "LILIANA RAQUEL PEREZ TORRES", zona: "Occidente", plaza: "CELAYA", puesto: "ROC"},
+      {nombre: "LIZBETH MOTA REYES", zona: "Occidente", plaza: "CELAYA", puesto: "ROC"},
+      {nombre: "GILDARDO VERDUGO SALAS", zona: "Occidente", plaza: "CULIACAN", puesto: "ROC"},
+      {nombre: "CARLOS GESSEM ELENES CAMARENA", zona: "Occidente", plaza: "CULIACAN", puesto: "ROC"},
+      {nombre: "DONEY LEVI DE LA CRUZ RAMIREZ", zona: "Occidente", plaza: "CULIACAN", puesto: "ROC"},
+      {nombre: "JESUS ADALBERTO PEREZ LOPEZ", zona: "Occidente", plaza: "CULIACAN", puesto: "ROC"},
+      {nombre: "JAIRO DAVID CORDOVA SALAZAR", zona: "Occidente", plaza: "CULIACAN", puesto: "ROC"},
+      {nombre: "KARLA TERESA RAMOS VALENZUELA", zona: "Occidente", plaza: "CULIACAN", puesto: "ROC"},
+      {nombre: "MAURO ENRIQUE ESPINOZA RAMOS", zona: "Occidente", plaza: "GUADALAJARA", puesto: "Gerente Operativo"},
+      {nombre: "GUILLERMO BRAVO MENDOZA", zona: "Occidente", plaza: "GUADALAJARA", puesto: "ROC"},
+      {nombre: "JESUS TOVAR FLORES", zona: "Occidente", plaza: "GUADALAJARA", puesto: "ROC"},
+      {nombre: "ADRIANA JUAREZ AGREDANO", zona: "Occidente", plaza: "GUADALAJARA", puesto: "ROC"},
+      {nombre: "KARLA ALEJANDRA GONZALEZ DAVALOS", zona: "Occidente", plaza: "GUADALAJARA", puesto: "ROC"},
+      {nombre: "KARLA STEPHANIA TELLEZ NUÑEZ", zona: "Occidente", plaza: "GUADALAJARA", puesto: "ROC"},
+      {nombre: "LORENA CASTAÑEDA AMEZQUITA", zona: "Occidente", plaza: "GUADALAJARA", puesto: "ROC"},
+      {nombre: "MARA ALEJANDRA RUIZ CRUZ", zona: "Occidente", plaza: "GUADALAJARA", puesto: "ROC"},
+      {nombre: "MONICA BERNAL RAMIREZ", zona: "Occidente", plaza: "GUADALAJARA", puesto: "ROC"},
+      {nombre: "SONIA GUADALUPE DELGADO BARUD", zona: "Occidente", plaza: "GUADALAJARA", puesto: "ROC"},
+      {nombre: "MARCOS PUEBLA GONZALEZ", zona: "Occidente", plaza: "LEON", puesto: "ROC"},
+      {nombre: "EDUARDO ARTURO FRANCO FRANCO", zona: "Occidente", plaza: "LEON", puesto: "ROC"},
+      {nombre: "MARCELA ALEJANDRA VACA HERNANDEZ", zona: "Occidente", plaza: "LEON", puesto: "ROC"},
+      {nombre: "ROGELIO MERCHAN GONZALEZ", zona: "Occidente", plaza: "MICHOACAN", puesto: "Gerente Operativo"},
+      {nombre: "RAMIRO GOMEZ CORONA", zona: "Occidente", plaza: "MICHOACAN", puesto: "ROC"},
+      {nombre: "EDGAR ALEJANDRO AVILA GONZALEZ", zona: "Occidente", plaza: "MICHOACAN", puesto: "ROC"},
+      {nombre: "EDGARDO MENDOZA REYES", zona: "Occidente", plaza: "MICHOACAN", puesto: "ROC"},
+      {nombre: "OMAR VIRRUETA CHAVARRIA", zona: "Occidente", plaza: "MICHOACAN", puesto: "ROC"},
+      {nombre: "MARIO GARCIA LOEZA", zona: "Occidente", plaza: "MICHOACAN", puesto: "ROC"},
+      {nombre: "ADRIANA MORALES PEREZ", zona: "Occidente", plaza: "MICHOACAN", puesto: "ROC"},
+      {nombre: "ARIADNA AIDE AMEZCUA GONZALEZ", zona: "Occidente", plaza: "MICHOACAN", puesto: "ROC"},
+      {nombre: "OLIVIA GARCIA GARCIA", zona: "Occidente", plaza: "STAFF CORPO", puesto: "Gerente Regional MKT"},
+      {nombre: "ENRIQUE HERNANDEZ SANCHEZ", zona: "Península", plaza: "CANCUN", puesto: "Gerente Operativo"},
+      {nombre: "MARISOL HERNANDEZ HERNANDEZ", zona: "Península", plaza: "CANCUN", puesto: "ROC"},
+      {nombre: "ALMA BEATRIZ YAM MAZUM", zona: "Península", plaza: "CANCUN", puesto: "ROC"},
+      {nombre: "MAURICIO PUGA MORENO", zona: "Península", plaza: "CANCUN", puesto: "ROC"},
+      {nombre: "GILBERTH ADRIAN MORALES JUAREZ", zona: "Península", plaza: "CANCUN", puesto: "ROC"},
+      {nombre: "NARCISO PINTO MORALES", zona: "Península", plaza: "CANCUN", puesto: "ROC"},
+      {nombre: "HECTOR ALFREDO PINEDA CABELLO", zona: "Península", plaza: "CANCUN", puesto: "ROC"},
+      {nombre: "ROGELIO HERNANDEZ GOMEZ", zona: "Península", plaza: "COATZACOALCOS", puesto: "ROC"},
+      {nombre: "GRISELDA FIALLO GUZMAN", zona: "Península", plaza: "COATZACOALCOS", puesto: "ROC"},
+      {nombre: "NANCY GUADALUPE ALBORES GORDILLO", zona: "Península", plaza: "COATZACOALCOS", puesto: "ROC"},
+      {nombre: "ANGELA ESTEFANIA GALVAN CABALLERO", zona: "Península", plaza: "MERIDA", puesto: "Gerente Regional MKT"},
+      {nombre: "MARIO ADALBERTO INURRETA COURET", zona: "Península", plaza: "MERIDA", puesto: "ROC"},
+      {nombre: "JORGE GUILLERMO ALCOCER NOVELO", zona: "Península", plaza: "MERIDA", puesto: "ROC"},
+      {nombre: "DAVID ENRIQUE FARFAN UC", zona: "Península", plaza: "MERIDA", puesto: "ROC"},
+      {nombre: "ABIGAIL AMELIA DUEÑAS MAY", zona: "Península", plaza: "MERIDA", puesto: "ROC"},
+      {nombre: "ALAIN JULIO HERNANDEZ BRITO", zona: "Península", plaza: "TABASCO", puesto: "ROC"},
+      {nombre: "JACOB AARON FRANCO CAMACHO", zona: "Península", plaza: "TABASCO", puesto: "ROC"},
+      {nombre: "DANIEL ALBERTO GOMEZ BALCAZAR", zona: "Península", plaza: "TABASCO", puesto: "ROC"},
+      {nombre: "FRANCISCO JAVIER VAZQUEZ GARCIA", zona: "Península", plaza: "TABASCO", puesto: "ROC"},
+      {nombre: "OMAR ANTONIO CRUZ GÓMEZ", zona: "Península", plaza: "TABASCO", puesto: "ROC"},
+      {nombre: "MARTIN ZAMORA JIMENEZ", zona: "Península", plaza: "TAPACHULA", puesto: "ROC"},
+      {nombre: "MANUEL TOLEDO SANTIAGO", zona: "Península", plaza: "TAPACHULA", puesto: "ROC"},
+      {nombre: "JUAN CARLOS ABADIA SALVADOR", zona: "Península", plaza: "TAPACHULA", puesto: "ROC"},
+      {nombre: "DARÍO JOSÉ ALVARADO CARRANZA", zona: "Península", plaza: "TAPACHULA", puesto: "ROC"},
+      {nombre: "ABRIL YUNNUEN ESTRADA VELASCO", zona: "Península", plaza: "TUXTLA", puesto: "Gerente Operativo"},
+      {nombre: "FRANCISCO PONCE REVILLA", zona: "Península", plaza: "TUXTLA", puesto: "ROC"},
+      {nombre: "GUILLERMO GOMEZ LARA", zona: "Península", plaza: "TUXTLA", puesto: "ROC"},
+      {nombre: "JOSE ANDRES SARMIENTO FARRERA", zona: "Península", plaza: "TUXTLA", puesto: "ROC"},
+      {nombre: "JOSE ANTONIO CRUZ RUIZ", zona: "Península", plaza: "TUXTLA", puesto: "ROC"},
+      {nombre: "ALEJANDRO SANCHEZ ARELLANO", zona: "Península", plaza: "TUXTLA", puesto: "ROC"},
+      {nombre: "ISAAC GAMERO MORALES", zona: "Península", plaza: "TUXTLA ALTOS", puesto: "ROC"},
+      {nombre: "JOSE QUINTIN CALCANEO VELAZQUEZ", zona: "Península", plaza: "TUXTLA ALTOS", puesto: "ROC"},
+      {nombre: "ALEJANDRA DEL CARMEN CRUZ HURTADO", zona: "Península", plaza: "VERACRUZ", puesto: "Gerente Operativo"},
+      {nombre: "JORGE LUIS QUINTANA REYES", zona: "Península", plaza: "VERACRUZ", puesto: "ROC"},
+      {nombre: "JUAN PABLO MORALES MURILLO", zona: "Península", plaza: "VERACRUZ", puesto: "ROC"},
+      {nombre: "ADRIAN ROGELIO RUIZ RODRIGUEZ", zona: "Península", plaza: "VERACRUZ", puesto: "ROC"},
+      {nombre: "LUIS BASSOCO CASTILLO", zona: "Península", plaza: "VERACRUZ", puesto: "ROC"},
+      {nombre: "CYNTHIA ARACELI VILLA USCANGA", zona: "Península", plaza: "VERACRUZ", puesto: "ROC"}
+    ];
+
+    // Ruleta 3: Corpo
+    const corpo = [
+      {nombre: "Jorge Gutiérrez", puesto: "Coordinador de Finanzas"},
+      {nombre: "Valeria Rojas", puesto: "Coordinador de TI"},
+      {nombre: "Héctor Paredes", puesto: "Coordinador Legal"},
+      {nombre: "Isabella Núñez", puesto: "Coordinador de Compras"},
+      {nombre: "Oscar Delgado", puesto: "Coordinador de Administración"},
+      {nombre: "Daniela Silva", puesto: "Coordinador de Auditoría"},
+      {nombre: "Rodrigo Méndez", puesto: "Coordinador de Planeación"},
+      {nombre: "Camila Vargas", puesto: "Coordinador de Calidad"}
+    ];
+
+    const colores = [
+      "#E63946", "#FF6B35", "#FF8C42", "#52B788", "#2A9D8F", 
+      "#8B5CF6", "#EC4899", "#06B6D4", "#F59E0B", "#10B981",
+      "#6366F1", "#EF4444", "#F97316", "#84CC16", "#14B8A6"
+    ];
+    
+    const canvas = document.getElementById("ruleta");
+    const ctx = canvas.getContext("2d");
+    const resultado = document.getElementById("resultado");
+    const detalles = document.getElementById("detalles");
+    const btnGirar = document.getElementById("btnGirar");
+
+    let ruletaActual = 0;
+    let participantesActuales = directores;
+    let rotationDeg = 0;
+
+    function cambiarRuleta(index) {
+      if (btnGirar.disabled) return;
+      
+      ruletaActual = index;
+      rotationDeg = 0;
+      canvas.style.transform = `rotate(0deg)`;
+      
+      // Cambiar datos según la ruleta seleccionada
+      if (index === 0) {
+        participantesActuales = directores;
+      } else if (index === 1) {
+        participantesActuales = gerentes;
+      } else {
+        participantesActuales = corpo;
+      }
+      
+      // Actualizar botones activos
+      document.querySelectorAll('.btn-selector').forEach((btn, i) => {
+        btn.classList.toggle('active', i === index);
+      });
+      
+      // Limpiar resultados
+      resultado.textContent = "";
+      detalles.innerHTML = "";
+      resultado.classList.remove("ganador");
+      
+      dibujarRuleta();
+    }
+
+    function dibujarRuleta() {
+      const num = participantesActuales.length;
+      const segDeg = 360 / num;
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+      const radius = Math.min(centerX, centerY) - 20;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      for (let i = 0; i < num; i++) {
+        const startAngle = (i * segDeg - 90 - segDeg / 2) * Math.PI / 180;
+        const endAngle = ((i + 1) * segDeg - 90 - segDeg / 2) * Math.PI / 180;
+        
+        // Dibujar segmento
+        ctx.beginPath();
+        ctx.fillStyle = colores[i % colores.length];
+        ctx.moveTo(centerX, centerY);
+        ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+        ctx.lineTo(centerX, centerY);
+        ctx.fill();
+        
+        // Borde blanco
+        ctx.strokeStyle = "white";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Texto
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        const midAngle = (startAngle + endAngle) / 2;
+        ctx.rotate(midAngle);
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillStyle = "white";
+        
+        // Ajustar tamaño de fuente según longitud del nombre
+        const nombreLength = participantesActuales[i].nombre.length;
+        let fontSize = 11;
+        if (nombreLength > 25) fontSize = 9;
+        if (nombreLength > 30) fontSize = 8;
+        
+        ctx.font = `bold ${fontSize}px Arial`;
+        ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
+        ctx.shadowBlur = 4;
+        ctx.shadowOffsetX = 2;
+        ctx.shadowOffsetY = 2;
+        ctx.fillText(participantesActuales[i].nombre, radius * 0.65, 0);
+        ctx.restore();
+      }
+    }
+
+    dibujarRuleta();
+
+    function easeOutCubic(t) {
+      return 1 - Math.pow(1 - t, 3);
+    }
+
+    function girar() {
+      if (btnGirar.disabled) return;
+      
+      btnGirar.disabled = true;
+      resultado.textContent = "";
+      detalles.innerHTML = "";
+      resultado.classList.remove("ganador");
+
+      const num = participantesActuales.length;
+      const segDeg = 360 / num;
+      const ganadorIndex = Math.floor(Math.random() * num);
+      
+      const vueltas = 5 + Math.floor(Math.random() * 3);
+      const targetAngle = -ganadorIndex * segDeg;
+      const currentNormalized = ((rotationDeg % 360) + 360) % 360;
+      const finalRotation = rotationDeg + (vueltas * 360) + (targetAngle - currentNormalized);
+      
+      const duracion = 4000;
+      const startTime = performance.now();
+      const startRotation = rotationDeg;
+
+      function animar(now) {
+        const t = Math.min((now - startTime) / duracion, 1);
+        const eased = easeOutCubic(t);
+        const current = startRotation + (finalRotation - startRotation) * eased;
+        canvas.style.transform = `rotate(${current}deg)`;
+
+        if (t < 1) {
+          requestAnimationFrame(animar);
+        } else {
+          rotationDeg = finalRotation;
+          
+          setTimeout(() => {
+            const ganador = participantesActuales[ganadorIndex];
+            resultado.textContent = `🎉 ¡Ganador: ${ganador.nombre}! 🎉`;
+            resultado.classList.add("ganador");
+            
+            // Mostrar detalles según el tipo de ruleta
+            let detallesHTML = "";
+            if (ruletaActual === 0) {
+              detallesHTML = `
+                <div><strong>Región:</strong> ${ganador.region}</div>
+                <div><strong>Plaza:</strong> ${ganador.plaza}</div>
+                <div><strong>Puesto:</strong> ${ganador.puesto}</div>
+              `;
+            } else if (ruletaActual === 1) {
+              detallesHTML = `
+                <div><strong>Zona de Gestión:</strong> ${ganador.zonaGestion}</div>
+                <div><strong>Plaza:</strong> ${ganador.plaza}</div>
+                <div><strong>Operativa:</strong> ${ganador.operativa}</div>
+                <div><strong>Puesto:</strong> ${ganador.puesto}</div>
+              `;
+            } else {
+              detallesHTML = `
+                <div><strong>Puesto:</strong> ${ganador.puesto}</div>
+              `;
+            }
+            
+            detalles.innerHTML = detallesHTML;
+            btnGirar.disabled = false;
+          }, 500);
+        }
+      }
+      
+      requestAnimationFrame(animar);
+    }
+  </script>
+
+</body>
+</html>
+
+<!--
+
+        const participants1 = [
+      {nombre: "NOE MENDEZ ROJAS", region: "Centro - Sur", plaza: "CUERNAVACA", puesto: "Director de Negocio"},
+      {nombre: "SANTIAGO ROMERO DE LA PAZ", region: "Centro - Sur", plaza: "OAXACA", puesto: "Director de Negocio"},
+      {nombre: "JESUS MAURICIO GONZALEZ DELGADO", region: "Centro - Sur", plaza: "PUEBLA", puesto: "Director de Negocio"},
+      {nombre: "GIOVANNI EMANUEL HERNANDEZ BRITO", region: "Centro - Sur", plaza: "PUEBLA FORANEAS", puesto: "Director de Negocio"},
+      {nombre: "ANDRES MARTINEZ CERDA", region: "Centro - Sur", plaza: "QUERETARO", puesto: "Director de Negocio"},
+      {nombre: "GUILLERMO RAUL TAMEZ ALANIS", region: "Centro - Sur", plaza: "VERACRUZ NORTE", puesto: "Director de Negocio"},
+      {nombre: "GABRIEL GUTIERREZ ROMERO", region: "Metro", plaza: "MEXICO CENTRO", puesto: "Director de Negocio"},
+      {nombre: "FERNANDO REGALADO HERNANDEZ", region: "Metro", plaza: "MEXICO NORTE", puesto: "Director de Negocio"},
+      {nombre: "JOSE RICARDO VAZQUEZ CORZO", region: "Metro", plaza: "MEXICO ORIENTE", puesto: "Director de Negocio"},
+      {nombre: "OCTAVIO GARCIA CABRERA", region: "Metro", plaza: "MEXICO SUR", puesto: "Director de Negocio"},
+      {nombre: "ROGELIO JESUS ALDAZABA CABALLERO", region: "Metro", plaza: "PACHUCA", puesto: "Director de Negocio"},
+      {nombre: "DIDIER SAMUEL GUILLEN TOVILLA", region: "Metro", plaza: "TOLUCA FORANEAS", puesto: "Director de Negocio"},
+      {nombre: "MIRNA ATZIMBA ARELLANO CARRILLO", region: "Norte", plaza: "AGUASCALIENTES", puesto: "Director de Negocio"},
+      {nombre: "AARON CEDANO AMADOR", region: "Norte", plaza: "BAJA CALIFORNIA NORTE", puesto: "Director de Negocio"},
+      {nombre: "ANTONIO DIAZ MARTINEZ", region: "Norte", plaza: "CHIHUAHUA", puesto: "Director de Negocio"},
+      {nombre: "JAIME ALBERTO HERRERA ESCORZA", region: "Norte", plaza: "COAHUILA", puesto: "Director de Negocio"},
+      {nombre: "JOSE MANUEL LAMADRID ROMO", region: "Norte", plaza: "HERMOSILLO", puesto: "Director de Negocio"},
+      {nombre: "PETRA LILIANA RODRIGUEZ NAJERA", region: "Norte", plaza: "MATAMOROS", puesto: "Director de Negocio"},
+      {nombre: "ROGELIO MARTINEZ GARZA", region: "Norte", plaza: "MONTERREY ORIENTE", puesto: "Director de Negocio"},
+      {nombre: "RAMIRO ISMAEL POMPA GONZALEZ", region: "Norte", plaza: "NUEVO LAREDO", puesto: "Director de Negocio"},
+      {nombre: "JUAN JOSE RUIZ PARAMO", region: "Norte", plaza: "REYNOSA", puesto: "Director de Negocio"},
+      {nombre: "FERNANDO ABRAHAM MONTIEL ZUÑIGA", region: "Norte", plaza: "SAN LUIS POTOSI", puesto: "Director de Negocio"},
+      {nombre: "LIMBANO ERNESTO LOPEZ MORENO", region: "Norte", plaza: "TAMPICO", puesto: "Director de Negocio"},
+      {nombre: "LUIS MAXIMILIANO ALCALDE DOMINGUEZ", region: "Occidente", plaza: "ACAPULCO", puesto: "Director de Negocio"},
+      {nombre: "PAULINO ESTEBAN CALIXTO RODRIGUEZ", region: "Occidente", plaza: "CELAYA", puesto: "Director de Negocio"},
+      {nombre: "FRANCISCO CONTRERAS REYNAGA", region: "Occidente", plaza: "CULIACAN", puesto: "Director de Negocio"},
+      {nombre: "MARCO ANTONIO CANTÓN RODRÍGUEZ", region: "Occidente", plaza: "GUADALAJARA", puesto: "Director de Negocio"},
+      {nombre: "SIMBAD MARTINEZ JONGUITUD", region: "Occidente", plaza: "LEON", puesto: "Director de Negocio"},
+      {nombre: "VICENTE GAONA CERVANTES", region: "Occidente", plaza: "MICHOACAN", puesto: "Director de Negocio"},
+      {nombre: "FELIX SAMER SIMAN ROJAS", region: "Península", plaza: "CANCUN", puesto: "Director de Negocio"},
+      {nombre: "GEORGINA GAMAS DE LA FUENTE", region: "Península", plaza: "COATZACOALCOS", puesto: "Director de Negocio"},
+      {nombre: "ESTEBAN PUGA CRUZ", region: "Península", plaza: "MERIDA", puesto: "Director de Negocio"},
+      {nombre: "FRANCISCO JAVIER TZOMPANTZI SANCHEZ", region: "Península", plaza: "TABASCO", puesto: "Director de Negocio"},
+      {nombre: "ROCIO BEATRIZ CRUZ GUTIERREZ", region: "Península", plaza: "TAPACHULA", puesto: "Director de Negocio"},
+      {nombre: "NINIVE CRUZ RAMIREZ", region: "Península", plaza: "TUXTLA", puesto: "Director de Negocio"},
+      {nombre: "ALFONSO ESTEBAN PUGA CRUZ", region: "Península", plaza: "TUXTLA ALTOS", puesto: "Director de Negocio"},
+      {nombre: "HUMBERTO JESUS BONOLA ARRONIZ", region: "Península", plaza: "VERACRUZ", puesto: "Director de Negocio"}
+    ];
+
+    const participants2 = [
+      {nombre: "VIRIDIANA REZA VAZQUEZ", zona: "Centro - Sur", plaza: "CUERNAVACA", puesto: "Gerente Operativo"},
+      {nombre: "FRANCISCO LOPEZ MARTINEZ", zona: "Centro - Sur", plaza: "CUERNAVACA", puesto: "ROC"},
+      {nombre: "MANUEL ALEJANDRO DORANTES ESTEBAN", zona: "Centro - Sur", plaza: "CUERNAVACA", puesto: "ROC"},
+      {nombre: "ISRAEL GARRIDO RODRIGUEZ", zona: "Centro - Sur", plaza: "CUERNAVACA", puesto: "ROC"},
+      {nombre: "ANDREA ISAYANA SANCHEZ RUIZ", zona: "Centro - Sur", plaza: "CUERNAVACA", puesto: "ROC"},
+      {nombre: "YENNI ADRIANA PEREZ PIZAÑA", zona: "Centro - Sur", plaza: "CUERNAVACA", puesto: "ROC"},
+      {nombre: "DULCE MARIA ANTONIO MARTINEZ", zona: "Centro - Sur", plaza: "OAXACA", puesto: "Gerente Operativo"},
+      {nombre: "IVAN ELIEL BARRIOS CASTELLANOS", zona: "Centro - Sur", plaza: "OAXACA", puesto: "ROC"},
+      {nombre: "HERMINIO GOMEZ GUZMAN", zona: "Centro - Sur", plaza: "OAXACA", puesto: "ROC"},
+      {nombre: "CARLOS OCTAVIO IBAÑEZ BALAN", zona: "Centro - Sur", plaza: "OAXACA", puesto: "ROC"},
+      {nombre: "HECTOR SANTIAGO CHAVEZ", zona: "Centro - Sur", plaza: "OAXACA", puesto: "ROC"},
+      {nombre: "EDGAR JONATHAN BAUTISTA VENTURA", zona: "Centro - Sur", plaza: "OAXACA", puesto: "ROC"},
+      {nombre: "BRISA EDITH MENDEZ CRUZ", zona: "Centro - Sur", plaza: "OAXACA", puesto: "ROC"},
+      {nombre: "MOISES HERNANDEZ ESPINOSA", zona: "Centro - Sur", plaza: "PUEBLA", puesto: "Gerente Operativo"},
+      {nombre: "JOSE FRANCISCO RODRIGUEZ OTERO", zona: "Centro - Sur", plaza: "PUEBLA", puesto: "ROC"},
+      {nombre: "JORGE MEYO LEON", zona: "Centro - Sur", plaza: "PUEBLA", puesto: "ROC"},
+      {nombre: "ARTURO MELENDEZ MORA", zona: "Centro - Sur", plaza: "PUEBLA", puesto: "ROC"},
+      {nombre: "MARIA CONCEPCION GARCIA BONILLA", zona: "Centro - Sur", plaza: "PUEBLA", puesto: "ROC"},
+      {nombre: "AUDREY MONTSERRAT BARCELO CRUZ", zona: "Centro - Sur", plaza: "PUEBLA", puesto: "ROC"},
+      {nombre: "JOSE LUIS BAHENA GARCIA", zona: "Norte", plaza: "PUEBLA FORANEAS", puesto: "ROC"},
+      {nombre: "MIGUEL ANGEL BADILLO MAXIMO", zona: "Centro - Sur", plaza: "PUEBLA FORANEAS", puesto: "ROC"},
+      {nombre: "YADIRA GUADALUPE RUIZ SANTIAGO", zona: "Centro - Sur", plaza: "PUEBLA FORANEAS", puesto: "ROC"},
+      {nombre: "ARELI AGUILAR MUÑOZ", zona: "Centro - Sur", plaza: "PUEBLA FORANEAS", puesto: "ROC"},
+      {nombre: "PAOLA GISSELLE SANCHEZ MALDONADO", zona: "Centro - Sur", plaza: "PUEBLA FORANEAS", puesto: "ROC"},
+      {nombre: "LUIS ALBERTO CORONA RIVERA", zona: "Centro - Sur", plaza: "QUERETARO", puesto: "ROC"},
+      {nombre: "RAFAEL FRANCISCO SILVA FERRUZCA", zona: "Centro - Sur", plaza: "QUERETARO", puesto: "ROC"},
+      {nombre: "ISRAEL MARTINEZ DE SANTIAGO", zona: "Centro - Sur", plaza: "QUERETARO", puesto: "ROC"},
+      {nombre: "JESUS ROBERTO CHAVEZ MENDOZA", zona: "Centro - Sur", plaza: "QUERETARO", puesto: "ROC"},
+      {nombre: "NORMA ALEJANDRA SANTAMARIA HOYOS", zona: "Centro - Sur", plaza: "QUERETARO", puesto: "ROC"},
+      {nombre: "VICTORIA DENISSE GUTIERREZ DAVILA", zona: "Centro - Sur", plaza: "QUERETARO", puesto: "ROC"},
+      {nombre: "SOFHIA PEREZ LOPEZ", zona: "Centro - Sur", plaza: "STAFF CORPO", puesto: "Gerente Regional MKT"},
+      {nombre: "FEDERICO GALAN COLORADO", zona: "Centro - Sur", plaza: "VERACRUZ NORTE", puesto: "Gerente Operativo"},
+      {nombre: "AGUSTIN GUEVARA ROLDAN", zona: "Centro - Sur", plaza: "VERACRUZ NORTE", puesto: "ROC"},
+      {nombre: "MIGUEL ANGEL VEGA LIMON", zona: "Centro - Sur", plaza: "VERACRUZ NORTE", puesto: "ROC"},
+      {nombre: "DANY GANDARA GALINDO", zona: "Centro - Sur", plaza: "VERACRUZ NORTE", puesto: "ROC"},
+      {nombre: "MAIRA MARQUEZ TELLEZ", zona: "Centro - Sur", plaza: "VERACRUZ NORTE", puesto: "ROC"},
+      {nombre: "SILVIA RIVERA DE LA LUZ", zona: "Centro - Sur", plaza: "VERACRUZ NORTE", puesto: "ROC"},
+      {nombre: "ROSALIA CABALLERO OLVERA", zona: "Corporativo", plaza: "CORPORATIVO", puesto: "Gerente sr RRHH"},
+      {nombre: "SARA SOTO MARQUEZ", zona: "Corporativo", plaza: "CORPORATIVO", puesto: "Gerente sr RRHH"},
+      {nombre: "JUAN MANUEL ESTRADA PEREZ", zona: "Corporativo", plaza: "CORPORATIVO", puesto: "Gerente sr RRHH"},
+      {nombre: "DIDIER LOPEZ PIEDRAS", zona: "Metro", plaza: "METRO", puesto: "Gerente Operativo"},
+      {nombre: "JORGE ALBERTO CASTILLO MEZA", zona: "Metro", plaza: "Metro", puesto: "Gerente Regional MKT"},
+      {nombre: "LUIS ALFREDO TREJO ZARRAGA", zona: "Metro", plaza: "MEXICO CENTRO", puesto: "ROC"},
+      {nombre: "ALBERTO HERNANDEZ", zona: "Metro", plaza: "MEXICO CENTRO", puesto: "ROC"},
+      {nombre: "RAMSES HERNANDEZ MELGAREJO", zona: "Metro", plaza: "MEXICO CENTRO", puesto: "ROC"},
+      {nombre: "JOSE ADRIAN PEREZ SUAREZ", zona: "Metro", plaza: "MEXICO CENTRO", puesto: "ROC"},
+      {nombre: "FRANCISCO MANUEL ROCHA VILLEGAS", zona: "Metro", plaza: "MEXICO CENTRO", puesto: "ROC"},
+      {nombre: "YOLANDA AMADOR CARREON", zona: "Metro", plaza: "MEXICO CENTRO", puesto: "ROC"},
+      {nombre: "ARACELY SANCHEZ MAY", zona: "Metro", plaza: "MEXICO CENTRO", puesto: "ROC"},
+      {nombre: "JORGE LUIS VELAZQUEZ SANCHEZ", zona: "Metro", plaza: "MEXICO NORTE", puesto: "ROC"},
+      {nombre: "LUIS ANGEL QUIROZ FLORES", zona: "Metro", plaza: "MEXICO NORTE", puesto: "ROC"},
+      {nombre: "SANDRA DUEÑAS HERNANDEZ", zona: "Metro", plaza: "MEXICO NORTE", puesto: "ROC"},
+      {nombre: "JOANA MALDONADO ACOSTA", zona: "Metro", plaza: "MEXICO NORTE", puesto: "ROC"},
+      {nombre: "MARIO ALBERTO CALVO MENDOZA", zona: "Metro", plaza: "MEXICO ORIENTE", puesto: "ROC"},
+      {nombre: "ANTONIO VAZQUEZ LARA", zona: "Metro", plaza: "MEXICO ORIENTE", puesto: "ROC"},
+      {nombre: "DAVID PEREZ TORRES", zona: "Metro", plaza: "MEXICO ORIENTE", puesto: "ROC"},
+      {nombre: "GERARDO RANGEL RODRIGUEZ", zona: "Metro", plaza: "MEXICO ORIENTE", puesto: "ROC"},
+      {nombre: "EDITH GONZALEZ BARRIOS", zona: "Metro", plaza: "MEXICO ORIENTE", puesto: "ROC"},
+      {nombre: "NOEMI ORTIZ PEREZ", zona: "Metro", plaza: "MEXICO ORIENTE", puesto: "ROC"},
+      {nombre: "ANDREA ISABEL ALVAREZ HERNANDEZ", zona: "Metro", plaza: "MEXICO ORIENTE", puesto: "ROC"},
+      {nombre: "JUAN CARLOS NEGRETE GARCIA", zona: "Metro", plaza: "MEXICO SUR", puesto: "ROC"},
+      {nombre: "FERNANDO ROSAS HERNANDEZ", zona: "Metro", plaza: "MEXICO SUR", puesto: "ROC"},
+      {nombre: "ENRIQUE SANCHEZ MORALES", zona: "Metro", plaza: "MEXICO SUR", puesto: "ROC"},
+      {nombre: "DANIEL ARTURO NIETO SALINAS", zona: "Metro", plaza: "MEXICO SUR", puesto: "ROC"},
+      {nombre: "ROSA ALBA AMADOR CARREON", zona: "Metro", plaza: "MEXICO SUR", puesto: "ROC"},
+      {nombre: "ESMERALDA BANDALA GUERRERO", zona: "Metro", plaza: "MEXICO SUR", puesto: "ROC"},
+      {nombre: "GRETEL LOPEZ SANDOVAL", zona: "Metro", plaza: "MEXICO SUR", puesto: "ROC"},
+      {nombre: "VICTOR SAMUEL RODRIGUEZ NERI", zona: "Metro", plaza: "PACHUCA", puesto: "ROC"},
+      {nombre: "EDSON MISAEL BARRERA SALINAS", zona: "Metro", plaza: "PACHUCA", puesto: "ROC"},
+      {nombre: "ARTURO RICO LEINES", zona: "Metro", plaza: "PACHUCA", puesto: "ROC"},
+      {nombre: "FERNANDO CERON MORALES", zona: "Metro", plaza: "PACHUCA", puesto: "ROC"},
+      {nombre: "JUAN CARLOS GARCIA ROMERO", zona: "Metro", plaza: "PACHUCA", puesto: "ROC"},
+      {nombre: "DIEGO VELARDE PEREZ", zona: "Metro", plaza: "TOLUCA", puesto: "ROC"},
+      {nombre: "ERICK JAVIER MARCIAL CASTAÑEDA", zona: "Metro", plaza: "TOLUCA", puesto: "ROC"},
+      {nombre: "BLANCA FLOR ORDOÑEZ ESPINOSA", zona: "Metro", plaza: "TOLUCA", puesto: "ROC"},
+      {nombre: "NOHEMI ROSAS CRUZ", zona: "Metro", plaza: "TOLUCA", puesto: "ROC"},
+      {nombre: "RICARDO MOJICA JIMENEZ", zona: "Metro", plaza: "TOLUCA FORANEAS", puesto: "ROC"},
+      {nombre: "ALEJANDRO MONDRAGON BECERRIL", zona: "Metro", plaza: "TOLUCA FORANEAS", puesto: "ROC"},
+      {nombre: "JENNIFER NIDIA MAFRA LUNA", zona: "Metro", plaza: "TOLUCA FORANEAS", puesto: "ROC"},
+      {nombre: "LUIS ANTONIO AGUILAR CHAVEZ", zona: "Norte", plaza: "AGUASCALIENTES", puesto: "ROC"},
+      {nombre: "MARIA CRISTINA VALDERRAMA SANCHEZ", zona: "Norte", plaza: "AGUASCALIENTES", puesto: "ROC"},
+      {nombre: "EDGARDO MORALES COLIN", zona: "Norte", plaza: "BAJA CALIFORNIA NORTE", puesto: "ROC"},
+      {nombre: "ULISES UGARTE CELAYA", zona: "Norte", plaza: "BAJA CALIFORNIA NORTE", puesto: "ROC"},
+      {nombre: "PEDRO ANTONIO AMPARO FRAUSTO", zona: "Norte", plaza: "BAJA CALIFORNIA NORTE", puesto: "ROC"},
+      {nombre: "JOSE IGNACIO PEREZ ZAMUDIO", zona: "Norte", plaza: "BAJA CALIFORNIA NORTE", puesto: "ROC"},
+      {nombre: "OSVALDO TRINIDAD INZUNZA CAMPOS", zona: "Norte", plaza: "BAJA CALIFORNIA NORTE", puesto: "ROC"},
+      {nombre: "HUMBERTO MONTIEL MARQUEZ", zona: "Norte", plaza: "CHIHUAHUA", puesto: "ROC"},
+      {nombre: "CESAR ABRAHAM BEJARANO CHACON", zona: "Norte", plaza: "CHIHUAHUA", puesto: "ROC"},
+      {nombre: "AARON ALBERTO VILLALEJOS NUÑEZ", zona: "Norte", plaza: "CHIHUAHUA", puesto: "ROC"},
+      {nombre: "LEOBARDO PORTILLO BLANCO", zona: "Norte", plaza: "CHIHUAHUA", puesto: "ROC"},
+      {nombre: "MANUEL GILDARDO GUTIERREZ SAUCEDA", zona: "Norte", plaza: "CHIHUAHUA", puesto: "ROC"},
+      {nombre: "DENISE CORTES ROMERO", zona: "Norte", plaza: "CHIHUAHUA", puesto: "ROC"},
+      {nombre: "JORGE LUIS OLVERA CASTILLO", zona: "Norte", plaza: "COAHUILA", puesto: "ROC"},
+      {nombre: "AGUSTIN CRUZ BORJA", zona: "Norte", plaza: "COAHUILA", puesto: "ROC"},
+      {nombre: "BLANCA YADIRA OGAZON ORTIZ", zona: "Norte", plaza: "COAHUILA", puesto: "ROC"},
+      {nombre: "DANIEL VENTURA BARRIGA", zona: "Norte", plaza: "HERMOSILLO", puesto: "ROC"},
+      {nombre: "HUGO IGNACIO TORRES LOPEZ", zona: "Norte", plaza: "HERMOSILLO", puesto: "ROC"},
+      {nombre: "JESUS MANUEL MARCIAL APREZA", zona: "Norte", plaza: "HERMOSILLO", puesto: "ROC"},
+      {nombre: "EFREN ZUÑIGA CARRILLO", zona: "Norte", plaza: "HERMOSILLO", puesto: "ROC"},
+      {nombre: "KARINA BERENICE CORTEZ HERNANDEZ", zona: "Norte", plaza: "HERMOSILLO", puesto: "ROC"},
+      {nombre: "IVAN DE JESUS GARCIA SALAZAR", zona: "Norte", plaza: "MATAMOROS", puesto: "ROC"},
+      {nombre: "HUGO CARDOSA VICENCIO", zona: "Norte", plaza: "MATAMOROS", puesto: "ROC"},
+      {nombre: "JULIO ALEJANDRO AVALOS VILLA", zona: "Norte", plaza: "MONTERREY ORIENTE", puesto: "Gerente Operativo"},
+      {nombre: "MARTHA LILIANA GALINDO MARTINEZ", zona: "Norte", plaza: "MONTERREY ORIENTE", puesto: "ROC"},
+      {nombre: "HUMBERTO SANCHEZ GOMEZ", zona: "Norte", plaza: "MONTERREY ORIENTE", puesto: "ROC"},
+      {nombre: "FERNANDO DANIEL GRIMALDO VILLALOBOS", zona: "Norte", plaza: "MONTERREY ORIENTE", puesto: "ROC"},
+      {nombre: "MARTHA LAURA FAJARDO CRUZ", zona: "Norte", plaza: "MONTERREY ORIENTE", puesto: "ROC"},
+      {nombre: "ALAN GIOVANNI RESENDIZ RODRIGUEZ", zona: "Norte", plaza: "MONTERREY ORIENTE", puesto: "ROC"},
+      {nombre: "EDY ABRAHAM BERNABE ARRON", zona: "Norte", plaza: "MONTERREY ORIENTE", puesto: "ROC"},
+      {nombre: "BEATRIZ ELIZABETH GARCIA CASTILLO", zona: "Norte", plaza: "MONTERREY ORIENTE", puesto: "ROC"},
+      {nombre: "MARIO ALBERTO DE LA VEGA MENDOZA", zona: "Norte", plaza: "MONTERREY PONIENTE", puesto: "Gerente Operativo"},
+      {nombre: "SAIRA LOURDES HERNANDEZ SANCHEZ", zona: "Norte", plaza: "MONTERREY PONIENTE", puesto: "ROC"},
+      {nombre: "EDITH ZOPIYACTLE ZOPIYACTLE", zona: "Norte", plaza: "MONTERREY PONIENTE", puesto: "ROC"},
+      {nombre: "MAURICIO RODOLFO MIJANGOS FONSECA", zona: "Norte", plaza: "MONTERREY PONIENTE", puesto: "ROC"},
+      {nombre: "EMILIO AZAEL BRAVO MENDOZA", zona: "Norte", plaza: "MONTERREY PONIENTE", puesto: "ROC"},
+      {nombre: "ROBERTO PUENTE NAVARRO", zona: "Norte", plaza: "MONTERREY PONIENTE", puesto: "ROC"},
+      {nombre: "JOSE LUIS DE JESUS SILVA URBINA", zona: "Norte", plaza: "MONTERREY PONIENTE", puesto: "ROC"},
+      {nombre: "MARCO GABRIEL OSORNIO DEL RAZO", zona: "Norte", plaza: "NUEVO LAREDO", puesto: "ROC"},
+      {nombre: "DANIEL MONTOYA VARGAS", zona: "Norte", plaza: "NUEVO LAREDO", puesto: "ROC"},
+      {nombre: "LUIS FLAVIO CARRILLO CABELLO", zona: "Norte", plaza: "REYNOSA", puesto: "ROC"},
+      {nombre: "ADRIANA VARGAS MURILLO", zona: "Norte", plaza: "REYNOSA", puesto: "ROC"},
+      {nombre: "EDUARDO MELENDEZ TORRES", zona: "Norte", plaza: "SAN LUIS POTOSI", puesto: "ROC"},
+      {nombre: "ABELARDO ESTUDILLO BLAS", zona: "Norte", plaza: "SAN LUIS POTOSI", puesto: "ROC"},
+      {nombre: "YUNUEN ZARAHI MARTINEZ MARTINEZ", zona: "Norte", plaza: "SAN LUIS POTOSI", puesto: "ROC"},
+      {nombre: "CLAUDIA MARCELA DOMINGUEZ MORENO", zona: "Norte", plaza: "SAN LUIS POTOSI", puesto: "ROC"},
+      {nombre: "KARINA MARTINEZ ARAIZA", zona: "Norte", plaza: "SAN LUIS POTOSI", puesto: "ROC"},
+      {nombre: "VIRGINIO EDUARDO BARRAZA GRANADOS", zona: "Norte", plaza: "STAFF CORPO", puesto: "Gerente Regional MKT"},
+      {nombre: "JUAN ERIK BAEZ VAZQUEZ", zona: "Norte", plaza: "TAMPICO", puesto: "ROC"},
+      {nombre: "MAX ALEXANDER RUIZ CASTILLO", zona: "Norte", plaza: "TAMPICO", puesto: "ROC"},
+      {nombre: "KARLA JULISSA AGUILAR PIÑEIRO", zona: "Norte", plaza: "TAMPICO", puesto: "ROC"},
+      {nombre: "FERNANDO CABELLO HERNANDEZ", zona: "Occidente", plaza: "ACAPULCO", puesto: "ROC"},
+      {nombre: "MARIO ROJAS RAMIREZ", zona: "Occidente", plaza: "ACAPULCO", puesto: "ROC"},
+      {nombre: "EFREN BLANCO FIERRO", zona: "Occidente", plaza: "ACAPULCO", puesto: "ROC"},
+      {nombre: "ROBERTO EFRAIN BUENROSTRO SUAZO", zona: "Occidente", plaza: "ACAPULCO", puesto: "ROC"},
+      {nombre: "MAYRA ISABEL VERA RODRIGUEZ", zona: "Occidente", plaza: "ACAPULCO", puesto: "ROC"},
+      {nombre: "RODOLFO ANTONIO DIMAS ZAVALA", zona: "Occidente", plaza: "BAJA CALIFORNIA SUR", puesto: "ROC"},
+      {nombre: "MIGUEL ANGEL HERNANDEZ QUEVEDO", zona: "Occidente", plaza: "BAJA CALIFORNIA SUR", puesto: "ROC"},
+      {nombre: "MARTIN MATILDES SUAREZ", zona: "Occidente", plaza: "CELAYA", puesto: "ROC"},
+      {nombre: "ALEJANDRA MARIA ORTEGA LOPEZ", zona: "Occidente", plaza: "CELAYA", puesto: "ROC"},
+      {nombre: "LILIANA RAQUEL PEREZ TORRES", zona: "Occidente", plaza: "CELAYA", puesto: "ROC"},
+      {nombre: "LIZBETH MOTA REYES", zona: "Occidente", plaza: "CELAYA", puesto: "ROC"},
+      {nombre: "GILDARDO VERDUGO SALAS", zona: "Occidente", plaza: "CULIACAN", puesto: "ROC"},
+      {nombre: "CARLOS GESSEM ELENES CAMARENA", zona: "Occidente", plaza: "CULIACAN", puesto: "ROC"},
+      {nombre: "DONEY LEVI DE LA CRUZ RAMIREZ", zona: "Occidente", plaza: "CULIACAN", puesto: "ROC"},
+      {nombre: "JESUS ADALBERTO PEREZ LOPEZ", zona: "Occidente", plaza: "CULIACAN", puesto: "ROC"},
+      {nombre: "JAIRO DAVID CORDOVA SALAZAR", zona: "Occidente", plaza: "CULIACAN", puesto: "ROC"},
+      {nombre: "KARLA TERESA RAMOS VALENZUELA", zona: "Occidente", plaza: "CULIACAN", puesto: "ROC"},
+      {nombre: "MAURO ENRIQUE ESPINOZA RAMOS", zona: "Occidente", plaza: "GUADALAJARA", puesto: "Gerente Operativo"},
+      {nombre: "GUILLERMO BRAVO MENDOZA", zona: "Occidente", plaza: "GUADALAJARA", puesto: "ROC"},
+      {nombre: "JESUS TOVAR FLORES", zona: "Occidente", plaza: "GUADALAJARA", puesto: "ROC"},
+      {nombre: "ADRIANA JUAREZ AGREDANO", zona: "Occidente", plaza: "GUADALAJARA", puesto: "ROC"},
+      {nombre: "KARLA ALEJANDRA GONZALEZ DAVALOS", zona: "Occidente", plaza: "GUADALAJARA", puesto: "ROC"},
+      {nombre: "KARLA STEPHANIA TELLEZ NUÑEZ", zona: "Occidente", plaza: "GUADALAJARA", puesto: "ROC"},
+      {nombre: "LORENA CASTAÑEDA AMEZQUITA", zona: "Occidente", plaza: "GUADALAJARA", puesto: "ROC"},
+      {nombre: "MARA ALEJANDRA RUIZ CRUZ", zona: "Occidente", plaza: "GUADALAJARA", puesto: "ROC"},
+      {nombre: "MONICA BERNAL RAMIREZ", zona: "Occidente", plaza: "GUADALAJARA", puesto: "ROC"},
+      {nombre: "SONIA GUADALUPE DELGADO BARUD", zona: "Occidente", plaza: "GUADALAJARA", puesto: "ROC"},
+      {nombre: "MARCOS PUEBLA GONZALEZ", zona: "Occidente", plaza: "LEON", puesto: "ROC"},
+      {nombre: "EDUARDO ARTURO FRANCO FRANCO", zona: "Occidente", plaza: "LEON", puesto: "ROC"},
+      {nombre: "MARCELA ALEJANDRA VACA HERNANDEZ", zona: "Occidente", plaza: "LEON", puesto: "ROC"},
+      {nombre: "ROGELIO MERCHAN GONZALEZ", zona: "Occidente", plaza: "MICHOACAN", puesto: "Gerente Operativo"},
+      {nombre: "RAMIRO GOMEZ CORONA", zona: "Occidente", plaza: "MICHOACAN", puesto: "ROC"},
+      {nombre: "EDGAR ALEJANDRO AVILA GONZALEZ", zona: "Occidente", plaza: "MICHOACAN", puesto: "ROC"},
+      {nombre: "EDGARDO MENDOZA REYES", zona: "Occidente", plaza: "MICHOACAN", puesto: "ROC"},
+      {nombre: "OMAR VIRRUETA CHAVARRIA", zona: "Occidente", plaza: "MICHOACAN", puesto: "ROC"},
+      {nombre: "MARIO GARCIA LOEZA", zona: "Occidente", plaza: "MICHOACAN", puesto: "ROC"},
+      {nombre: "ADRIANA MORALES PEREZ", zona: "Occidente", plaza: "MICHOACAN", puesto: "ROC"},
+      {nombre: "ARIADNA AIDE AMEZCUA GONZALEZ", zona: "Occidente", plaza: "MICHOACAN", puesto: "ROC"},
+      {nombre: "OLIVIA GARCIA GARCIA", zona: "Occidente", plaza: "STAFF CORPO", puesto: "Gerente Regional MKT"},
+      {nombre: "ENRIQUE HERNANDEZ SANCHEZ", zona: "Península", plaza: "CANCUN", puesto: "Gerente Operativo"},
+      {nombre: "MARISOL HERNANDEZ HERNANDEZ", zona: "Península", plaza: "CANCUN", puesto: "ROC"},
+      {nombre: "ALMA BEATRIZ YAM MAZUM", zona: "Península", plaza: "CANCUN", puesto: "ROC"},
+      {nombre: "MAURICIO PUGA MORENO", zona: "Península", plaza: "CANCUN", puesto: "ROC"},
+      {nombre: "GILBERTH ADRIAN MORALES JUAREZ", zona: "Península", plaza: "CANCUN", puesto: "ROC"},
+      {nombre: "NARCISO PINTO MORALES", zona: "Península", plaza: "CANCUN", puesto: "ROC"},
+      {nombre: "HECTOR ALFREDO PINEDA CABELLO", zona: "Península", plaza: "CANCUN", puesto: "ROC"},
+      {nombre: "ROGELIO HERNANDEZ GOMEZ", zona: "Península", plaza: "COATZACOALCOS", puesto: "ROC"},
+      {nombre: "GRISELDA FIALLO GUZMAN", zona: "Península", plaza: "COATZACOALCOS", puesto: "ROC"},
+      {nombre: "NANCY GUADALUPE ALBORES GORDILLO", zona: "Península", plaza: "COATZACOALCOS", puesto: "ROC"},
+      {nombre: "ANGELA ESTEFANIA GALVAN CABALLERO", zona: "Península", plaza: "MERIDA", puesto: "Gerente Regional MKT"},
+      {nombre: "MARIO ADALBERTO INURRETA COURET", zona: "Península", plaza: "MERIDA", puesto: "ROC"},
+      {nombre: "JORGE GUILLERMO ALCOCER NOVELO", zona: "Península", plaza: "MERIDA", puesto: "ROC"},
+      {nombre: "DAVID ENRIQUE FARFAN UC", zona: "Península", plaza: "MERIDA", puesto: "ROC"},
+      {nombre: "ABIGAIL AMELIA DUEÑAS MAY", zona: "Península", plaza: "MERIDA", puesto: "ROC"},
+      {nombre: "ALAIN JULIO HERNANDEZ BRITO", zona: "Península", plaza: "TABASCO", puesto: "ROC"},
+      {nombre: "JACOB AARON FRANCO CAMACHO", zona: "Península", plaza: "TABASCO", puesto: "ROC"},
+      {nombre: "DANIEL ALBERTO GOMEZ BALCAZAR", zona: "Península", plaza: "TABASCO", puesto: "ROC"},
+      {nombre: "FRANCISCO JAVIER VAZQUEZ GARCIA", zona: "Península", plaza: "TABASCO", puesto: "ROC"},
+      {nombre: "OMAR ANTONIO CRUZ GÓMEZ", zona: "Península", plaza: "TABASCO", puesto: "ROC"},
+      {nombre: "MARTIN ZAMORA JIMENEZ", zona: "Península", plaza: "TAPACHULA", puesto: "ROC"},
+      {nombre: "MANUEL TOLEDO SANTIAGO", zona: "Península", plaza: "TAPACHULA", puesto: "ROC"},
+      {nombre: "JUAN CARLOS ABADIA SALVADOR", zona: "Península", plaza: "TAPACHULA", puesto: "ROC"},
+      {nombre: "DARÍO JOSÉ ALVARADO CARRANZA", zona: "Península", plaza: "TAPACHULA", puesto: "ROC"},
+      {nombre: "ABRIL YUNNUEN ESTRADA VELASCO", zona: "Península", plaza: "TUXTLA", puesto: "Gerente Operativo"},
+      {nombre: "FRANCISCO PONCE REVILLA", zona: "Península", plaza: "TUXTLA", puesto: "ROC"},
+      {nombre: "GUILLERMO GOMEZ LARA", zona: "Península", plaza: "TUXTLA", puesto: "ROC"},
+      {nombre: "JOSE ANDRES SARMIENTO FARRERA", zona: "Península", plaza: "TUXTLA", puesto: "ROC"},
+      {nombre: "JOSE ANTONIO CRUZ RUIZ", zona: "Península", plaza: "TUXTLA", puesto: "ROC"},
+      {nombre: "ALEJANDRO SANCHEZ ARELLANO", zona: "Península", plaza: "TUXTLA", puesto: "ROC"},
+      {nombre: "ISAAC GAMERO MORALES", zona: "Península", plaza: "TUXTLA ALTOS", puesto: "ROC"},
+      {nombre: "JOSE QUINTIN CALCANEO VELAZQUEZ", zona: "Península", plaza: "TUXTLA ALTOS", puesto: "ROC"},
+      {nombre: "ALEJANDRA DEL CARMEN CRUZ HURTADO", zona: "Península", plaza: "VERACRUZ", puesto: "Gerente Operativo"},
+      {nombre: "JORGE LUIS QUINTANA REYES", zona: "Península", plaza: "VERACRUZ", puesto: "ROC"},
+      {nombre: "JUAN PABLO MORALES MURILLO", zona: "Península", plaza: "VERACRUZ", puesto: "ROC"},
+      {nombre: "ADRIAN ROGELIO RUIZ RODRIGUEZ", zona: "Península", plaza: "VERACRUZ", puesto: "ROC"},
+      {nombre: "LUIS BASSOCO CASTILLO", zona: "Península", plaza: "VERACRUZ", puesto: "ROC"},
+      {nombre: "CYNTHIA ARACELI VILLA USCANGA", zona: "Península", plaza: "VERACRUZ", puesto: "ROC"}
+    ];
+
+ 
+
+    const participants3 = [
+      {nombre: "Carlo Omar Saucedo Cortes", puesto: "Gerente Gestion Operativa"},
+      {nombre: "Montserrat Alejandra Contreras Gonzalez", puesto: "Gerente Sr Emotivo"},
+      {nombre: "Carolina Flores Kennedy", puesto: "Gerente Sr Comercial Preventivo"},
+      {nombre: "Mónica Franco González", puesto: "Directora No Farma"},
+      {nombre: "Hermann Hoppenstedt Pedrero", puesto: "Gerente Sr Ultima Milla Y Crowdsourcing"},
+      {nombre: "William Noel Trainor Leonardo", puesto: "GERENTE SR CATALOGO EXTENDIDO"},
+      {nombre: "Ricardo Rocha Moreno", puesto: "Analista Información Central"},
+      {nombre: "Eduardo Garcia Ortiz", puesto: "Coordinador Gestión Operativa"},
+      {nombre: "Israel Isacc Muñoz Macias", puesto: "Expansión"},
+      {nombre: "Rodolfo Carlos Robles Trejo", puesto: "Expansión"},
+      {nombre: "Juan Fernando Menendez Guzman", puesto: "Expansión"},
+      {nombre: "Jose Luis Rodriguez Vallejo", puesto: "Gerente Sr Catman"},
+      {nombre: "Viridiana Estefania Hernández Rodriguez", puesto: "Analista Gestión Operativa"},
+      {nombre: "Samanta Estefania Rios Rojas", puesto: "Coordinadora de Gestión Operativa"},
+      {nombre: "Mayra Lizeth Rodriguez Davila", puesto: "Gerente Sr Mejora Continua"},
+      {nombre: "Diana Malagon Samperio", puesto: "Gerente Sr Modelo Operativo"},
+      {nombre: "Romelia Ramírez Ruiz", puesto: "G Sr Comunicaciones"},
+      {nombre: "Ivonne Ramírez Herández", puesto: "Gerente Str Proyectos"},
+      {nombre: "Ruth Maria Carranza Puente", puesto: "Gerente Sr Espacios Y Productividad"},
+      {nombre: "Ana Karina Arredondo Hinojosa", puesto: "Gerente Sr Brand"},
+      {nombre: "Maria Lourdes Orrantia Roman", puesto: "Gerente De Trade Mkt"},
+      {nombre: "Carolina Jimenez Jaramillo", puesto: "Gerente Sr Gestion Operativa"},
+      {nombre: "Alma Lucero Mendez Reyes", puesto: "Gerente Sr. Capacitacion"},
+      {nombre: "Alejandra Oyervides Solis", puesto: "Coordinadora de Mejora Continua"},
+      {nombre: "Maria Jose Ruiz Grimaldo", puesto: "Coordinador de Diseño"},
+      {nombre: "Carolina Perez Arreaga", puesto: "Analista de Materiales Capacitación"}
+    ];
+
+-->
